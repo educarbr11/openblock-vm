@@ -16,6 +16,7 @@ const MathUtil = require('./util/math-util');
 const Runtime = require('./engine/runtime');
 const StringUtil = require('./util/string-util');
 const formatMessage = require('format-message');
+const getArduinoDeviceTranslations = require('./util/arduino-device-translations');
 
 const Variable = require('./engine/variable');
 const newBlockIds = require('./util/new-block-ids');
@@ -1313,9 +1314,12 @@ class VirtualMachine extends EventEmitter {
      *     updated for a new locale (or empty if locale hasn't changed.)
      */
     setLocale (locale, messages) {
-        if (locale !== formatMessage.setup().locale) {
-            formatMessage.setup({locale: locale, translations: {[locale]: messages}});
-        }
+        const mergedMessages = Object.assign(
+            {},
+            messages,
+            getArduinoDeviceTranslations(locale)
+        );
+        formatMessage.setup({locale: locale, translations: {[locale]: mergedMessages}});
         return this.extensionManager.refreshBlocks();
     }
 
