@@ -53,6 +53,10 @@ class VirtualMachine extends EventEmitter {
          * @type {!Runtime}
          */
         this.runtime = new Runtime();
+        this.runtime.vm = this;
+        this.runtime.machineLearningModel = null;
+        this.runtime.machineLearningPrediction = null;
+        this.runtime.handPoseDetectionResult = null;
         centralDispatch.setService('runtime', this.runtime).catch(e => {
             log.error(`Failed to register runtime service: ${JSON.stringify(e)}`);
         });
@@ -194,6 +198,15 @@ class VirtualMachine extends EventEmitter {
         this.runtime.on(Runtime.HAS_CLOUD_DATA_UPDATE, hasCloudData => {
             this.emit(Runtime.HAS_CLOUD_DATA_UPDATE, hasCloudData);
         });
+        this.runtime.on('MACHINE_LEARNING_OPEN_TRAINER', () => {
+            this.emit('MACHINE_LEARNING_OPEN_TRAINER');
+        });
+        this.runtime.on('MACHINE_LEARNING_OPEN_RESULT', () => {
+            this.emit('MACHINE_LEARNING_OPEN_RESULT');
+        });
+        this.runtime.on('HAND_POSE_DETECTION_OPEN_RESULT', () => {
+            this.emit('HAND_POSE_DETECTION_OPEN_RESULT');
+        });
 
         this.extensionManager = new ExtensionManager(this.runtime);
 
@@ -257,9 +270,46 @@ class VirtualMachine extends EventEmitter {
      */
     clear () {
         this.runtime.dispose();
+        this.runtime.machineLearningModel = null;
+        this.runtime.machineLearningPrediction = null;
+        this.runtime.handPoseDetectionResult = null;
         this.editingTarget = null;
         this.emitTargetsUpdate(false /* Don't emit project change */);
         this.extensionManager.clearDevice();
+    }
+
+    setMachineLearningModel (data) {
+        this.runtime.machineLearningModel = data || null;
+        this.runtime.emitProjectChanged();
+        this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
+    }
+
+    getMachineLearningModel () {
+        return this.runtime.machineLearningModel || null;
+    }
+
+    setMachineLearningPrediction (prediction) {
+        this.runtime.machineLearningPrediction = prediction || null;
+    }
+
+    openMachineLearningTrainer () {
+        this.emit('MACHINE_LEARNING_OPEN_TRAINER');
+    }
+
+    openMachineLearningResult () {
+        this.emit('MACHINE_LEARNING_OPEN_RESULT');
+    }
+
+    setHandPoseDetectionResult (data) {
+        this.runtime.handPoseDetectionResult = data || null;
+    }
+
+    getHandPoseDetectionResult () {
+        return this.runtime.handPoseDetectionResult || null;
+    }
+
+    openHandPoseDetectionResult () {
+        this.emit('HAND_POSE_DETECTION_OPEN_RESULT');
     }
 
     /**

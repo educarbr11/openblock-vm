@@ -26,7 +26,9 @@ const builtinExtensions = {
     text2speech: () => require('../extensions/scratch3_text2speech'),
     translate: () => require('../extensions/scratch3_translate'),
     videoSensing: () => require('../extensions/scratch3_video_sensing'),
-    makeymakey: () => require('../extensions/scratch3_makeymakey')
+    makeymakey: () => require('../extensions/scratch3_makeymakey'),
+    machineLearning: () => require('../extensions/scratch3_machine_learning'),
+    handPoseDetection: () => require('../extensions/scratch3_hand_pose_detection')
 };
 
 const builtinDevices = {

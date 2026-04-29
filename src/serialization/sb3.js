@@ -578,6 +578,10 @@ const serialize = function (runtime, targetId) {
 
     obj.programMode = runtime.isRealtimeMode() ? 'realtime' : 'upload';
 
+    if (runtime.machineLearningModel) {
+        obj.machineLearning = runtime.machineLearningModel;
+    }
+
     // Assemble extension list
     obj.extensions = runtime.getLoadedScratchExtension();
 
@@ -1271,6 +1275,8 @@ const deserialize = function (json, runtime, zip, isSingleSprite) {
     } else {
         runtime.origin = null;
     }
+    runtime.machineLearningModel = json.machineLearning || null;
+    runtime.machineLearningPrediction = null;
 
     // First keep track of the current target order in the json,
     // then sort by the layer order property before parsing the targets
