@@ -500,8 +500,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.COMMAND,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D0
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 0
                             },
                             MODE: {
                                 type: ArgumentType.STRING,
@@ -520,8 +520,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.COMMAND,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D0
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 0
                             },
                             LEVEL: {
                                 type: ArgumentType.STRING,
@@ -541,8 +541,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.COMMAND,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D3
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 3
                             },
                             OUT: {
                                 type: ArgumentType.UINT8_NUMBER,
@@ -561,8 +561,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.BOOLEAN,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D0
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 0
                             }
                         }
                     },
@@ -576,8 +576,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.REPORTER,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.A0
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 0
                             }
                         }
                     },
@@ -593,8 +593,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.COMMAND,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D3
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 3
                             },
                             OUT: {
                                 type: ArgumentType.HALF_ANGLE,
@@ -614,8 +614,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.CONDITIONAL,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D3
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 3
                             },
                             MODE: {
                                 type: ArgumentType.STRING,
@@ -636,8 +636,8 @@ class OpenBlockArduinoUnoDevice {
                         blockType: BlockType.COMMAND,
                         arguments: {
                             PIN: {
-                                type: ArgumentType.STRING,
-                                defaultValue: Pins.D3
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 3
                             }
                         },
                         programMode: [ProgramModeType.UPLOAD]
