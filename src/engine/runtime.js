@@ -18,6 +18,7 @@ const StageLayering = require('./stage-layering');
 const Variable = require('./variable');
 const xmlEscape = require('../util/xml-escape');
 const ScratchLinkWebSocket = require('../util/scratch-link-websocket');
+const ScratchLinkWebSerial = require('../util/scratch-link-web-serial');
 
 // Virtual I/O devices.
 const Clock = require('../io/clock');
@@ -1786,6 +1787,9 @@ class Runtime extends EventEmitter {
      * @returns {ScratchLinkSocket} The new scratch link socket (a WebSocket object)
      */
     _defaultScratchLinkSocketFactory (type) {
+        if (ScratchLinkWebSerial.isSupported(type)) {
+            return new ScratchLinkWebSerial(type);
+        }
         return new ScratchLinkWebSocket(type);
     }
 
