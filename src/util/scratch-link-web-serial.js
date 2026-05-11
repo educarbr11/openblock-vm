@@ -46,12 +46,14 @@ class ScratchLinkWebSerial {
         }
     }
 
-    async close () {
-        await this._disconnectPort();
-        this._isOpen = false;
-        if (this._onClose) {
-            this._onClose();
-        }
+    close () {
+        this._disconnectPort()
+            .then(() => {
+                this._isOpen = false;
+                if (this._onClose) {
+                    this._onClose();
+                }
+            });
     }
 
     sendMessage (message) {
@@ -78,18 +80,20 @@ class ScratchLinkWebSerial {
         return this._isOpen;
     }
 
-    async _handleRequest (request) {
-        try {
-            const result = await this._dispatch(request.method, request.params || {});
-            this._sendResponse(request.id, result, null);
-        } catch (error) {
-            this._sendResponse(request.id, null, {
-                message: error && error.message ? error.message : String(error)
+    _handleRequest (request) {
+        Promise.resolve()
+            .then(() => this._dispatch(request.method, request.params || {}))
+            .then(result => {
+                this._sendResponse(request.id, result, null);
+            })
+            .catch(error => {
+                this._sendResponse(request.id, null, {
+                    message: error && error.message ? error.message : String(error)
+                });
+                if (this._onError) {
+                    this._onError(error);
+                }
             });
-            if (this._onError) {
-                this._onError(error);
-            }
-        }
     }
 
     _sendResponse (id, result, error) {
@@ -114,7 +118,7 @@ class ScratchLinkWebSerial {
         });
     }
 
-    async _dispatch (method, params) {
+    _dispatch (method, params) {
         switch (method) {
         case 'discover':
             return this._discover(params);
@@ -145,25 +149,29 @@ class ScratchLinkWebSerial {
         }
     }
 
-    async _discover (params) {
+    _discover (params) {
         this._ports = {};
-        let ports = await navigator.serial.getPorts();
-
-        if (ports.length === 0 && navigator.userActivation && navigator.userActivation.isActive) {
-            try {
-                ports = [await navigator.serial.requestPort(this._makeRequestOptions(params.filters || {}))];
-            } catch (error) {
-                if (error && error.name === 'NotFoundError') {
-                    return null;
+        const filters = params.filters || {};
+        return navigator.serial.getPorts()
+            .then(ports => {
+                if (ports.length === 0 && navigator.userActivation && navigator.userActivation.isActive) {
+                    return navigator.serial.requestPort(this._makeRequestOptions(filters))
+                        .then(port => [port])
+                        .catch(error => {
+                            if (error && error.name === 'NotFoundError') {
+                                return [];
+                            }
+                            throw error;
+                        });
                 }
-                throw error;
-            }
-        }
-
-        ports
-            .filter(port => this._matchesFilters(port, params.filters || {}))
-            .forEach(port => this._reportPort(port));
-        return null;
+                return ports;
+            })
+            .then(ports => {
+                ports
+                    .filter(port => this._matchesFilters(port, filters))
+                    .forEach(port => this._reportPort(port));
+                return null;
+            });
     }
 
     _makeRequestOptions (filters) {
@@ -218,7 +226,7 @@ class ScratchLinkWebSerial {
         });
     }
 
-    async _connect (params) {
+    _connect (params) {
         const port = this._ports[params.peripheralId];
         if (!port) {
             throw new Error(`invalid peripheral ID: ${params.peripheralId}`);
@@ -230,36 +238,46 @@ class ScratchLinkWebSerial {
             dataBits: config.dataBits || this._serialOptions.dataBits,
             stopBits: config.stopBits || this._serialOptions.stopBits
         };
-        await port.open(this._serialOptions);
-        this._port = port;
-        this._portId = params.peripheralId;
-        return null;
+        return port.open(this._serialOptions)
+            .then(() => {
+                this._port = port;
+                this._portId = params.peripheralId;
+                return null;
+            });
     }
 
-    async _disconnectPort () {
+    _disconnectPort () {
         this._readActive = false;
-        if (this._reader) {
-            try {
-                await this._reader.cancel();
-            } catch (e) {
-                // Ignore cancellation errors during shutdown.
+        const reader = this._reader;
+        this._reader = null;
+        const releaseReader = () => {
+            if (reader) {
+                try {
+                    reader.releaseLock();
+                } catch (e) {
+                    // Ignore lock release errors during shutdown.
+                }
             }
-            try {
-                this._reader.releaseLock();
-            } catch (e) {
-                // Ignore lock release errors during shutdown.
-            }
-            this._reader = null;
-        }
-        if (this._port) {
-            await this._port.close();
+        };
+        const closePort = () => {
+            const port = this._port;
             this._port = null;
             this._portId = null;
+            if (!port) return Promise.resolve(null);
+            return port.close().then(() => null);
+        };
+        if (!reader) {
+            return closePort();
         }
-        return null;
+        return reader.cancel()
+            .catch(() => null)
+            .then(() => {
+                releaseReader();
+                return closePort();
+            });
     }
 
-    async _updateBaudrate (params) {
+    _updateBaudrate (params) {
         if (!params || !params.baudRate) {
             return null;
         }
@@ -269,28 +287,30 @@ class ScratchLinkWebSerial {
         if (this._port && this._portId) {
             const portId = this._portId;
             const port = this._port;
-            await this._disconnectPort();
-            await port.open(this._serialOptions);
-            this._port = port;
-            this._portId = portId;
+            return this._disconnectPort()
+                .then(() => port.open(this._serialOptions))
+                .then(() => {
+                    this._port = port;
+                    this._portId = portId;
+                    return null;
+                });
         }
         return null;
     }
 
-    async _write (params) {
+    _write (params) {
         if (!this._port || !this._port.writable) {
             throw new Error('Serial port is not connected');
         }
         const writer = this._port.writable.getWriter();
-        try {
-            await writer.write(this._decodeMessage(params.message, params.encoding));
-        } finally {
-            writer.releaseLock();
-        }
-        return null;
+        return writer.write(this._decodeMessage(params.message, params.encoding))
+            .then(() => null)
+            .finally(() => {
+                writer.releaseLock();
+            });
     }
 
-    async _read () {
+    _read () {
         if (!this._port || !this._port.readable || this._readActive) {
             return null;
         }
@@ -300,26 +320,31 @@ class ScratchLinkWebSerial {
         return null;
     }
 
-    async _readLoop () {
-        try {
-            while (this._readActive && this._reader) {
-                const result = await this._reader.read();
-                if (result.done) break;
+    _readLoop () {
+        if (!this._readActive || !this._reader) {
+            return;
+        }
+        this._reader.read()
+            .then(result => {
+                if (result.done || !this._readActive) {
+                    return;
+                }
                 if (result.value) {
                     this._sendRemoteRequest('onMessage', {
                         encoding: 'base64',
                         message: this._toBase64(result.value)
                     });
                 }
-            }
-        } catch (error) {
-            if (this._readActive) {
-                this._sendRemoteRequest('peripheralUnplug', null);
-                if (this._onError) {
-                    this._onError(error);
+                this._readLoop();
+            })
+            .catch(error => {
+                if (this._readActive) {
+                    this._sendRemoteRequest('peripheralUnplug', null);
+                    if (this._onError) {
+                        this._onError(error);
+                    }
                 }
-            }
-        }
+            });
     }
 
     _decodeMessage (message, encoding) {
