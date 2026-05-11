@@ -501,7 +501,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
                                 defaultValue: Pins.D0
                             },
                             MODE: {
@@ -522,7 +521,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
                                 defaultValue: Pins.D0
                             },
                             LEVEL: {
@@ -544,7 +542,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pwmPins',
                                 defaultValue: Pins.D3
                             },
                             OUT: {
@@ -565,7 +562,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
                                 defaultValue: Pins.D0
                             }
                         }
@@ -581,7 +577,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'analogPins',
                                 defaultValue: Pins.A0
                             }
                         }
@@ -599,7 +594,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pwmPins',
                                 defaultValue: Pins.D3
                             },
                             OUT: {
@@ -621,7 +615,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'interruptPins',
                                 defaultValue: Pins.D3
                             },
                             MODE: {
@@ -644,7 +637,6 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'interruptPins',
                                 defaultValue: Pins.D3
                             }
                         },
