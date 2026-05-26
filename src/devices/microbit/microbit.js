@@ -3,7 +3,7 @@ const formatMessage = require('format-message');
 const ArgumentType = require('../../extension-support/argument-type');
 const BlockType = require('../../extension-support/block-type');
 
-const CommonPeripheral = require('../common/common-peripheral');
+const MicrobitRealtimePeripheral = require('../common/microbit-realtime-peripheral');
 
 /**
 * The list of USB device filters.
@@ -89,7 +89,7 @@ const Level = {
 /**
  * Manage communication with a Microbit peripheral over a OpenBlock Link client socket.
  */
-class Microbit extends CommonPeripheral{
+class Microbit extends MicrobitRealtimePeripheral{
     /**
      * Construct a Microbit communication object.
      * @param {Runtime} runtime - the OpenBlock runtime
@@ -475,7 +475,7 @@ class OpenBlockMicrobitDevice {
      * @returns {Array.<object>} metadata for this extension and its blocks.
      */
     getInfo () {
-        return [{
+        const categories = [{
             id: 'pin',
             name: formatMessage({
                 id: 'microbit.category.pins',
@@ -569,7 +569,7 @@ class OpenBlockMicrobitDevice {
                         default: 'pin [PIN] is touched',
                         description: 'microbit pin is touched'
                     }),
-                    blockType: BlockType.REPORTER,
+                    blockType: BlockType.BOOLEAN,
                     arguments: {
                         PIN: {
                             type: ArgumentType.STRING,
@@ -996,6 +996,255 @@ class OpenBlockMicrobitDevice {
             menus: { }
         }
         ];
+
+        const supportedOpcodes = [
+            'setDigitalOutput',
+            'setPwmOutput',
+            'readDigitalPin',
+            'readAnalogPin',
+            'pinTouched',
+            'showImage',
+            'clearDisplay',
+            'buttonIsPressed',
+            'gestureIsX',
+            'axisAcceleration',
+            'lightLevel',
+            'temperature',
+            'runningTime'
+        ];
+        const supportedOpcodeSet = new Set(supportedOpcodes);
+        const blocks = [
+            {
+                opcode: 'whenMicrobitBegin',
+                text: formatMessage({
+                    id: 'microbit.event.whenMicrobitBegin',
+                    default: 'when micro:bit starts',
+                    description: 'microbit realtime starts'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false
+            },
+            {
+                opcode: 'whenButtonPressed',
+                text: formatMessage({
+                    id: 'microbit.event.whenButtonPressed',
+                    default: 'when button [KEY] pressed',
+                    description: 'microbit button pressed event'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false,
+                arguments: {
+                    KEY: {
+                        type: ArgumentType.STRING,
+                        menu: 'keys',
+                        defaultValue: Key.A
+                    }
+                }
+            },
+            {
+                opcode: 'whenPinTouched',
+                text: formatMessage({
+                    id: 'microbit.event.whenPinTouched',
+                    default: 'when pin [PIN] touched',
+                    description: 'microbit pin touched event'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false,
+                arguments: {
+                    PIN: {
+                        type: ArgumentType.STRING,
+                        menu: 'touchPins',
+                        defaultValue: Pins.P0
+                    }
+                }
+            },
+            {
+                opcode: 'whenGesture',
+                text: formatMessage({
+                    id: 'microbit.event.whenGesture',
+                    default: 'when gesture [STA]',
+                    description: 'microbit gesture event'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false,
+                arguments: {
+                    STA: {
+                        type: ArgumentType.STRING,
+                        menu: 'gestrues',
+                        defaultValue: Gestrue.Shake
+                    }
+                }
+            },
+            '---'
+        ];
+
+        let previousWasSeparator = true;
+        const addBlock = block => {
+            if (block === '---') {
+                if (!previousWasSeparator && blocks.length > 0) {
+                    blocks.push(block);
+                    previousWasSeparator = true;
+                }
+                return;
+            }
+            blocks.push(block);
+            previousWasSeparator = false;
+        };
+
+        categories.forEach(category => {
+            category.blocks.forEach(block => {
+                if (block === '---') {
+                    addBlock(block);
+                    return;
+                }
+                if (supportedOpcodeSet.has(block.opcode)) {
+                    addBlock(block);
+                }
+            });
+            addBlock('---');
+        });
+
+        if (blocks[blocks.length - 1] === '---') {
+            blocks.pop();
+        }
+
+        const menus = {};
+        categories.forEach(category => Object.assign(menus, category.menus));
+
+        return [{
+            id: 'microbit',
+            name: formatMessage({
+                id: 'microbit.category.microbit',
+                default: 'micro:bit',
+                description: 'The name of the microbit device category'
+            }),
+            color1: '#4CBFE6',
+            color2: '#2E8EB8',
+            color3: '#2E8EB8',
+            blocks: blocks,
+            menus: menus
+        }];
+    }
+
+    /**
+     * Set pin digital out level.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the set pin digital out level is done.
+     */
+    setDigitalOutput (args) {
+        this._peripheral.setDigitalOutput(args.PIN, args.LEVEL);
+        return Promise.resolve();
+    }
+
+    /**
+     * Set pin pwm out value.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the set pin pwm out value is done.
+     */
+    setPwmOutput (args) {
+        this._peripheral.setPwmOutput(args.PIN, args.OUT);
+        return Promise.resolve();
+    }
+
+    /**
+     * Read pin digital level.
+     * @param {object} args - the block's arguments.
+     * @return {boolean} - true if read high level, false if read low level.
+     */
+    readDigitalPin (args) {
+        return this._peripheral.readDigitalPin(args.PIN);
+    }
+
+    /**
+     * Read analog pin.
+     * @param {object} args - the block's arguments.
+     * @return {number} - analog value of the pin.
+     */
+    readAnalogPin (args) {
+        return this._peripheral.readAnalogPin(args.PIN);
+    }
+
+    /**
+     * Read pin touch state.
+     * @param {object} args - the block's arguments.
+     * @return {boolean} - true if pin is touched.
+     */
+    pinTouched (args) {
+        return this._peripheral.pinTouched(args.PIN);
+    }
+
+    /**
+     * Read button state.
+     * @param {object} args - the block's arguments.
+     * @return {boolean} - true if button is pressed.
+     */
+    buttonIsPressed (args) {
+        return this._peripheral.buttonIsPressed(args.KEY);
+    }
+
+    /**
+     * Read gesture state.
+     * @param {object} args - the block's arguments.
+     * @return {boolean} - true if gesture matches.
+     */
+    gestureIsX (args) {
+        return this._peripheral.gestureIsX(args.STA);
+    }
+
+    /**
+     * Read axis acceleration.
+     * @param {object} args - the block's arguments.
+     * @return {number} - acceleration value.
+     */
+    axisAcceleration (args) {
+        return this._peripheral.axisAcceleration(args.AXIS);
+    }
+
+    /**
+     * Read light level.
+     * @return {number} - light level.
+     */
+    lightLevel () {
+        return this._peripheral.lightLevel();
+    }
+
+    /**
+     * Read temperature.
+     * @return {number} - celsius temperature.
+     */
+    temperature () {
+        return this._peripheral.temperature();
+    }
+
+    /**
+     * Read running time.
+     * @return {number} - running time in milliseconds.
+     */
+    runningTime () {
+        return this._peripheral.runningTime();
+    }
+
+    /**
+     * Show image on the micro:bit display.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the image is sent.
+     */
+    showImage (args) {
+        this._peripheral.showImage(args.VALUE);
+        return Promise.resolve();
+    }
+
+    /**
+     * Clear the micro:bit display.
+     * @return {Promise} - a Promise that resolves after the display is cleared.
+     */
+    clearDisplay () {
+        this._peripheral.clearDisplay();
+        return Promise.resolve();
     }
 }
 
