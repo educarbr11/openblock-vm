@@ -213,6 +213,8 @@ class MicroBit {
 
     /**
      * Called by the runtime when user wants to scan for a peripheral.
+     * @param {Array} _pnpIdList - unused list of plug and play ids.
+     * @param {boolean} listAll - whether to list all connectable peripherals.
      */
     scan (_pnpIdList, listAll = false) {
         if (this._ble) {
@@ -790,6 +792,38 @@ class Scratch3MicroBitBlocks {
                             defaultValue: '0'
                         }
                     }
+                },
+                {
+                    opcode: 'isPinConnected',
+                    text: formatMessage({
+                        id: 'microbit.isPinConnected',
+                        default: 'pin [PIN] connected?',
+                        description: 'whether the selected micro:bit pin is connected to Earth/Ground'
+                    }),
+                    blockType: BlockType.BOOLEAN,
+                    arguments: {
+                        PIN: {
+                            type: ArgumentType.STRING,
+                            menu: 'touchPins',
+                            defaultValue: '0'
+                        }
+                    }
+                },
+                {
+                    opcode: 'getPinValue',
+                    text: formatMessage({
+                        id: 'microbit.pinValue',
+                        default: 'pin [PIN] value',
+                        description: 'the latest touch connection value for the selected micro:bit pin'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    arguments: {
+                        PIN: {
+                            type: ArgumentType.STRING,
+                            menu: 'touchPins',
+                            defaultValue: '0'
+                        }
+                    }
                 }
             ],
             menus: {
@@ -1018,6 +1052,27 @@ class Scratch3MicroBitBlocks {
         if (isNaN(pin)) return;
         if (pin < 0 || pin > 2) return false;
         return this._peripheral._checkPinState(pin);
+    }
+
+    /**
+     * Test whether the selected touch pin is connected to ground.
+     * @param {object} args - the block's arguments.
+     * @return {boolean} - true if the touch pin is connected.
+     */
+    isPinConnected (args) {
+        return this.getPinValue(args) !== 0;
+    }
+
+    /**
+     * Get the latest touch pin value reported by the Scratch micro:bit BLE firmware.
+     * @param {object} args - the block's arguments.
+     * @return {number} - 1 when connected, otherwise 0.
+     */
+    getPinValue (args) {
+        const pin = parseInt(args.PIN, 10);
+        if (isNaN(pin)) return 0;
+        if (pin < 0 || pin > 2) return 0;
+        return this._peripheral._checkPinState(pin) ? 1 : 0;
     }
 }
 
