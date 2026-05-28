@@ -15,7 +15,7 @@ class BLE extends JSONRPC {
         super();
 
         this._socket = runtime.getScratchLinkSocket('BLE');
-        this._socket.setOnOpen(this.requestPeripheral.bind(this));
+        this._socket.setOnOpen(this._handleOpen.bind(this));
         this._socket.setOnClose(this.handleDisconnectError.bind(this));
         this._socket.setOnError(this._handleRequestError.bind(this));
         this._socket.setHandleMessage(this._handleMessage.bind(this));
@@ -29,7 +29,9 @@ class BLE extends JSONRPC {
         this._resetCallback = resetCallback;
         this._discoverTimeoutID = null;
         this._deviceId = deviceId;
+        this._onOpenCallbacks = [];
         this._peripheralOptions = peripheralOptions;
+        this._skipInitialDiscover = Boolean(peripheralOptions.skipInitialDiscover);
         this._runtime = runtime;
 
         this._socket.open();
@@ -49,6 +51,22 @@ class BLE extends JSONRPC {
             .catch(e => {
                 this._handleRequestError(e);
             });
+    }
+
+    _handleOpen () {
+        if (!this._skipInitialDiscover) {
+            this.requestPeripheral();
+        }
+        this._onOpenCallbacks.forEach(callback => callback());
+        this._onOpenCallbacks = [];
+    }
+
+    _onSocketOpen (callback) {
+        if (this._socket.isOpen()) {
+            callback();
+        } else {
+            this._onOpenCallbacks.push(callback);
+        }
     }
 
     /**
@@ -162,6 +180,32 @@ class BLE extends JSONRPC {
             });
     }
 
+    uploadFirmware (config) {
+        return new Promise((resolve, reject) => {
+            this._onSocketOpen(() => {
+                this.sendRemoteRequest('uploadFirmware', config)
+                    .then(resolve)
+                    .catch(e => {
+                        this._handleRequestError(e);
+                        reject(e);
+                    });
+            });
+        });
+    }
+
+    abortUpload () {
+        return new Promise((resolve, reject) => {
+            this._onSocketOpen(() => {
+                this.sendRemoteRequest('abortUpload', {})
+                    .then(resolve)
+                    .catch(e => {
+                        this._handleRequestError(e);
+                        reject(e);
+                    });
+            });
+        });
+    }
+
     /**
      * Handle a received call from the socket.
      * @param {string} method - a received method label.
@@ -202,6 +246,21 @@ class BLE extends JSONRPC {
             if (this._characteristicDidChangeCallback) {
                 this._characteristicDidChangeCallback(params.message);
             }
+            break;
+        case 'uploadStdout':
+            this._runtime.emit(this._runtime.constructor.PERIPHERAL_UPLOAD_STDOUT, params);
+            break;
+        case 'uploadError':
+            this._runtime.emit(this._runtime.constructor.PERIPHERAL_UPLOAD_ERROR, params);
+            break;
+        case 'uploadSuccess':
+            this._runtime.emit(this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, params ? params.aborted : false);
+            break;
+        case 'setUploadAbortEnabled':
+            this._runtime.emit(this._runtime.constructor.PERIPHERAL_SET_UPLOAD_ABORT_ENABLED, params);
+            break;
+        case 'peripheralUnplug':
+            this.handleDisconnectError();
             break;
         case 'ping':
             return 42;
