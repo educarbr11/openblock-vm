@@ -17,16 +17,10 @@ const localResourcesServerUrl = 'http://127.0.0.1:20112/';
 // TODO: change extension spec so that library info, including extension ID, can be collected through static methods
 
 const builtinExtensions = {
-    // This is an example that isn't loaded with the other core blocks,
-    // but serves as a reference for loading core blocks as extensions.
-    coreExample: () => require('../blocks/scratch3_core_example'),
-    // These are the non-core built-in extensions.
     pen: () => require('../extensions/scratch3_pen'),
     music: () => require('../extensions/scratch3_music'),
     text2speech: () => require('../extensions/scratch3_text2speech'),
-    translate: () => require('../extensions/scratch3_translate'),
     videoSensing: () => require('../extensions/scratch3_video_sensing'),
-    makeymakey: () => require('../extensions/scratch3_makeymakey'),
     microbitBle: () => require('../extensions/scratch3_microbit_ble'),
     machineLearning: () => require('../extensions/scratch3_machine_learning'),
     handPoseDetection: () => require('../extensions/scratch3_hand_pose_detection')
@@ -36,36 +30,12 @@ const builtinDevices = {
     // Arduino Uno
     arduinoUno: () => require('../devices/arduinoUno/arduinoUno'),
     arduinoNano: () => require('../devices/arduinoUno/arduinoNano'),
-    arduinoUnoUltra: () => require('../devices/arduinoUno/arduinoUnoUltra'),
-    arduinoUnoSE: () => require('../devices/arduinoUno/arduinoUnoSE'),
     // Arduino Leonardo
     arduinoLeonardo: () => require('../devices/arduinoLeonardo/arduinoLeonardo'),
-    makeyMakey: () => require('../devices/arduinoLeonardo/makeyMakey'),
-    // Arduino Mega2560
-    arduinoMega2560: () => require('../devices/arduinoMega2560/arduinoMega2560'),
-    // Arduino Uno R4 Minima
-    arduinoUnoR4Minima: () => require('../devices/arduinoUnoR4Minima/arduinoUnoR4Minima'),
     // Arduino Uno R4 WiFi
     arduinoUnoR4Wifi: () => require('../devices/arduinoUnoR4Wifi/arduinoUnoR4Wifi'),
     // Esp32
     arduinoEsp32: () => require('../devices/arduinoEsp32/arduinoEsp32'),
-    // Esp32-S3
-    arduinoEsp32S3: () => require('../devices/arduinoEsp32S3/arduinoEsp32S3'),
-    // Esp8266
-    arduinoEsp8266: () => require('../devices/arduinoEsp8266/arduinoEsp8266'),
-    arduinoEsp8266NodeMCU: () => require('../devices/arduinoEsp8266/arduinoEsp8266NodeMCU'),
-    // K210
-    arduinoK210: () => require('../devices/arduinoK210/arduinoK210'),
-    arduinoK210MaixDock: () => require('../devices/arduinoK210/arduinoK210MaixDock'),
-    arduinoK210Maixduino: () => require('../devices/arduinoK210/arduinoK210Maixduino'),
-    // Raspberry Pi Pico
-    arduinoRaspberryPiPico: () => require('../devices/arduinoRaspberryPiPico/arduinoRaspberryPiPico'),
-    // Raspberry Pi Pico W
-    arduinoRaspberryPiPicoW: () => require('../devices/arduinoRaspberryPiPicoW/arduinoRaspberryPiPicoW'),
-    // Raspberry Pi Pico 2
-    arduinoRaspberryPiPico2: () => require('../devices/arduinoRaspberryPiPico2/arduinoRaspberryPiPico2'),
-    // Raspberry Pi Pico 2W
-    arduinoRaspberryPiPico2W: () => require('../devices/arduinoRaspberryPiPico2W/arduinoRaspberryPiPico2W'),
     // Microbit
     microbit: () => require('../devices/microbit/microbit'),
     microbitV2: () => require('../devices/microbit/microbitV2')
@@ -75,6 +45,16 @@ const builtinDevices = {
     // ev3: () => require('../extensions/scratch3_ev3'),
     // boost: () => require('../extensions/scratch3_boost'),
     // gdxfor: () => require('../extensions/scratch3_gdx_for')
+};
+
+const allowedBuiltinExtensionIds = new Set(Object.keys(builtinExtensions));
+const allowedBuiltinDeviceIds = new Set(Object.keys(builtinDevices));
+
+const analysisRealDeviceId = deviceId => {
+    if (deviceId && deviceId.indexOf('_') !== -1) {
+        return deviceId.split('_')[1];
+    }
+    return deviceId;
 };
 
 /**
@@ -217,6 +197,10 @@ class ExtensionManager {
      * @param {string} extensionId - the ID of an internal extension
      */
     loadExtensionIdSync (extensionId) {
+        if (!allowedBuiltinExtensionIds.has(extensionId)) {
+            log.warn(`Extension ${extensionId} is not allowed in this desktop build.`);
+            return;
+        }
         if (!builtinExtensions.hasOwnProperty(extensionId)) {
             log.warn(`Could not find extension ${extensionId} in the built in extensions.`);
             return;
@@ -242,6 +226,10 @@ class ExtensionManager {
      * @returns {Promise} resolved once the extension is loaded and initialized or rejected on failure
      */
     loadExtensionURL (extensionURL) {
+        if (!allowedBuiltinExtensionIds.has(extensionURL)) {
+            log.warn(`Extension ${extensionURL} is not allowed in this desktop build.`);
+            return Promise.resolve();
+        }
         if (builtinExtensions.hasOwnProperty(extensionURL)) {
             /** @TODO dupe handling for non-builtin extensions. See commit 670e51d33580e8a2e852b3b038bb3afc282f81b9 */
             if (this.isExtensionLoaded(extensionURL)) {
@@ -315,6 +303,11 @@ class ExtensionManager {
                     });
 
                     filteredDevices = filteredDevices.filter(dev => {
+                        const realDeviceId = analysisRealDeviceId(dev.deviceId);
+                        if (!allowedBuiltinDeviceIds.has(realDeviceId)) {
+                            return false;
+                        }
+
                         // Filter out external non-inherited devices
                         if ((dev.deviceId.indexOf('_') === -1) && (!!dev.name)) {
                             return false;
@@ -358,7 +351,11 @@ class ExtensionManager {
         }
         const {deviceId, type, pnpidList} = device;
 
-        const realDeviceId = this.runtime.analysisRealDeviceId(deviceId);
+        const realDeviceId = analysisRealDeviceId(deviceId);
+        if (!allowedBuiltinDeviceIds.has(realDeviceId)) {
+            log.warn(`Device ${deviceId} is not allowed in this desktop build.`);
+            return Promise.reject(`Error while load device is not allowed: ${deviceId}`);
+        }
 
         if (builtinDevices.hasOwnProperty(realDeviceId)) {
             if (this.isDeviceLoaded(deviceId)) {
@@ -422,6 +419,10 @@ class ExtensionManager {
                     // filter unsupported distribution content
                     let filteredExtensions = [];
                     filteredExtensions = extensions.filter(extension => {
+                        if (!allowedBuiltinExtensionIds.has(extension.extensionId)) {
+                            return false;
+                        }
+
                         // if the extension only has main.js but no blocks.js,
                         // the plugin should be blocked
                         if (!!extension.main && !extension.blocks) {
