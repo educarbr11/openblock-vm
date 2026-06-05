@@ -170,6 +170,16 @@ class MicroBit {
     }
 
     /**
+     * Set a touch pin digital value through the Scratch micro:bit BLE protocol.
+     * @param {number} pin - the pin number to set.
+     * @param {number} value - the digital value, 0 or 1.
+     * @return {Promise} - a Promise that resolves when writing to peripheral.
+     */
+    setPinValue (pin, value) {
+        return this.send(BLECommand.CMD_PIN_CONFIG, new Uint8Array([pin, value]));
+    }
+
+    /**
      * @return {number} - the latest value received for the tilt sensor's tilt about the X axis.
      */
     get tiltX () {
@@ -537,6 +547,22 @@ class Scratch3MicroBitBlocks {
     }
 
     /**
+     * @return {array} - text and values for each digital pin value menu element
+     */
+    get PIN_VALUE_MENU () {
+        return [
+            {
+                text: '0',
+                value: '0'
+            },
+            {
+                text: '1',
+                value: '1'
+            }
+        ];
+    }
+
+    /**
      * @return {array} - text and values for each tilt direction menu element
      */
     get TILT_DIRECTION_MENU () {
@@ -824,6 +850,27 @@ class Scratch3MicroBitBlocks {
                             defaultValue: '0'
                         }
                     }
+                },
+                {
+                    opcode: 'setPinValue',
+                    text: formatMessage({
+                        id: 'microbit.setPinValue',
+                        default: 'set pin [PIN] value to [VALUE]',
+                        description: 'set the selected micro:bit pin digital value to 0 or 1'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        PIN: {
+                            type: ArgumentType.STRING,
+                            menu: 'touchPins',
+                            defaultValue: '0'
+                        },
+                        VALUE: {
+                            type: ArgumentType.STRING,
+                            menu: 'pinValues',
+                            defaultValue: '1'
+                        }
+                    }
                 }
             ],
             menus: {
@@ -850,6 +897,10 @@ class Scratch3MicroBitBlocks {
                 touchPins: {
                     acceptReporters: true,
                     items: ['0', '1', '2']
+                },
+                pinValues: {
+                    acceptReporters: true,
+                    items: this.PIN_VALUE_MENU
                 }
             }
         }];
@@ -1073,6 +1124,25 @@ class Scratch3MicroBitBlocks {
         if (isNaN(pin)) return 0;
         if (pin < 0 || pin > 2) return 0;
         return this._peripheral._checkPinState(pin) ? 1 : 0;
+    }
+
+    /**
+     * Set the selected micro:bit pin to digital value 0 or 1.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after a tick.
+     */
+    setPinValue (args) {
+        const pin = parseInt(args.PIN, 10);
+        if (isNaN(pin) || pin < 0 || pin > 2) return;
+
+        const value = cast.toNumber(args.VALUE) === 0 ? 0 : 1;
+        this._peripheral.setPinValue(pin, value);
+
+        return new Promise(resolve => {
+            setTimeout(() => {
+                resolve();
+            }, BLESendInterval);
+        });
     }
 }
 
