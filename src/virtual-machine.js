@@ -353,9 +353,10 @@ class VirtualMachine extends EventEmitter {
      * Tell the specified extension to scan for a peripheral.
      * @param {string} extensionId - the id of the extension.
      * @param {bool} listAll - wether list all connectable device.
+     * @param {string} connectionType - optional connection transport type.
      */
-    scanForPeripheral (extensionId, listAll) {
-        this.runtime.scanForPeripheral(extensionId, listAll);
+    scanForPeripheral (extensionId, listAll, connectionType) {
+        this.runtime.scanForPeripheral(extensionId, listAll, connectionType);
     }
 
     /**
@@ -363,9 +364,10 @@ class VirtualMachine extends EventEmitter {
      * @param {string} extensionId - the id of the extension.
      * @param {number} peripheralId - the id of the peripheral.
      * @param {number} baudrate - the baudrate.
+     * @param {string} connectionType - optional connection transport type.
      */
-    connectPeripheral (extensionId, peripheralId, baudrate) {
-        this.runtime.connectPeripheral(extensionId, peripheralId, baudrate);
+    connectPeripheral (extensionId, peripheralId, baudrate, connectionType) {
+        this.runtime.connectPeripheral(extensionId, peripheralId, baudrate, connectionType);
     }
 
     /**

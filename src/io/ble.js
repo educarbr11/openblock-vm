@@ -14,7 +14,8 @@ class BLE extends JSONRPC {
     constructor (runtime, deviceId, peripheralOptions, connectCallback, resetCallback = null) {
         super();
 
-        this._socket = runtime.getScratchLinkSocket('BLE');
+        const socketType = peripheralOptions.connectionType === 'webBluetooth' ? 'WEB_BLUETOOTH' : 'BLE';
+        this._socket = runtime.getScratchLinkSocket(socketType);
         this._socket.setOnOpen(this._handleOpen.bind(this));
         this._socket.setOnClose(this.handleDisconnectError.bind(this));
         this._socket.setOnError(this._handleRequestError.bind(this));

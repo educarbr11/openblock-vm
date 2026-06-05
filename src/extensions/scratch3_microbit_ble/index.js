@@ -225,12 +225,14 @@ class MicroBit {
      * Called by the runtime when user wants to scan for a peripheral.
      * @param {Array} _pnpIdList - unused list of plug and play ids.
      * @param {boolean} listAll - whether to list all connectable peripherals.
+     * @param {string} connectionType - optional connection transport type.
      */
-    scan (_pnpIdList, listAll = false) {
+    scan (_pnpIdList, listAll = false, connectionType = 'link') {
         if (this._ble) {
             this._ble.disconnect();
         }
         this._ble = new BLE(this._runtime, this._extensionId, {
+            connectionType,
             listAll,
             filters: [
                 {services: [BLEUUID.service]}
@@ -260,14 +262,16 @@ class MicroBit {
     }
 
     uploadFirmware () {
-        if (!this._ble) {
-            this._ble = new BLE(this._runtime, this._extensionId, {
-                skipInitialDiscover: true,
-                filters: [
-                    {services: [BLEUUID.service]}
-                ]
-            }, this._onConnect, this.reset);
+        if (this._ble) {
+            this._ble.disconnect();
         }
+        this._ble = new BLE(this._runtime, this._extensionId, {
+            connectionType: 'link',
+            skipInitialDiscover: true,
+            filters: [
+                {services: [BLEUUID.service]}
+            ]
+        }, this._onConnect, this.reset);
         this._ble.uploadFirmware({type: this._extensionId});
     }
 

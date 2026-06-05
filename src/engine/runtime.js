@@ -19,6 +19,7 @@ const Variable = require('./variable');
 const xmlEscape = require('../util/xml-escape');
 const ScratchLinkWebSocket = require('../util/scratch-link-websocket');
 const ScratchLinkWebSerial = require('../util/scratch-link-web-serial');
+const ScratchLinkWebBluetooth = require('../util/scratch-link-web-bluetooth');
 
 // Virtual I/O devices.
 const Clock = require('../io/clock');
@@ -1790,6 +1791,9 @@ class Runtime extends EventEmitter {
         if (ScratchLinkWebSerial.isSupported(type)) {
             return new ScratchLinkWebSerial(type);
         }
+        if (ScratchLinkWebBluetooth.isSupported(type)) {
+            return new ScratchLinkWebBluetooth(type);
+        }
         return new ScratchLinkWebSocket(type);
     }
 
@@ -1822,12 +1826,13 @@ class Runtime extends EventEmitter {
      * Tell the specified extension to scan for a peripheral.
      * @param {string} deviceId - the id of the device.
      * @param {bool} listAll - wether list all connectable device.
+     * @param {string} connectionType - optional connection transport type.
      */
-    scanForPeripheral (deviceId, listAll) {
+    scanForPeripheral (deviceId, listAll, connectionType) {
         deviceId = this.analysisRealDeviceId(deviceId);
 
         if (this.peripheralExtensions[deviceId]) {
-            this.peripheralExtensions[deviceId].scan(this._device.pnpIdList, listAll);
+            this.peripheralExtensions[deviceId].scan(this._device.pnpIdList, listAll, connectionType);
         }
     }
 
@@ -1836,12 +1841,13 @@ class Runtime extends EventEmitter {
      * @param {string} deviceId - the id of the device.
      * @param {number} peripheralId - the id of the peripheral.
      * @param {number} baudrate - the baudrate.
+     * @param {string} connectionType - optional connection transport type.
      */
-    connectPeripheral (deviceId, peripheralId, baudrate) {
+    connectPeripheral (deviceId, peripheralId, baudrate, connectionType) {
         deviceId = this.analysisRealDeviceId(deviceId);
 
         if (this.peripheralExtensions[deviceId]) {
-            this.peripheralExtensions[deviceId].connect(peripheralId, baudrate);
+            this.peripheralExtensions[deviceId].connect(peripheralId, baudrate, connectionType);
         }
     }
 
