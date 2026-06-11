@@ -176,10 +176,14 @@ const fetchBitmapCanvas_ = function (costume, runtime, rotationCenter) {
                 assetMatchesBase: scale === 1 && !textImageElement
             };
         })
-        .catch(() => {
-            // Clean up the text layer properties if it fails to load
-            delete costume.textLayerMD5;
-            delete costume.textLayerAsset;
+        .catch(error => {
+            // If the optional Scratch 1.4 text layer fails, load the base bitmap without it.
+            if (costume.textLayerAsset) {
+                delete costume.textLayerMD5;
+                delete costume.textLayerAsset;
+                return fetchBitmapCanvas_(costume, runtime, rotationCenter);
+            }
+            return Promise.reject(error);
         });
 };
 
