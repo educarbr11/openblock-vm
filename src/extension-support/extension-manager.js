@@ -11,6 +11,16 @@ const BlockType = require('./block-type');
 
 // Local resources server address
 const localResourcesServerUrl = 'http://127.0.0.1:20112/';
+const shouldUseLocalResourcesServer = () => {
+    if (typeof process !== 'undefined' && process.env &&
+        process.env.OPENBLOCK_LOCAL_RESOURCES === 'true') {
+        return true;
+    }
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        return navigator.userAgent.indexOf('Electron') !== -1;
+    }
+    return false;
+};
 
 // These extensions are currently built into the VM repository but should not be loaded at startup.
 // TODO: move these out into a separate repository?
@@ -278,6 +288,9 @@ class ExtensionManager {
      */
     getDeviceList () {
         return new Promise(resolve => {
+            if (!shouldUseLocalResourcesServer()) {
+                return resolve();
+            }
             fetch(`${localResourcesServerUrl}devices/${formatMessage.setup().locale}.json`)
                 .then(response => response.json())
                 .then(devices => {
@@ -413,6 +426,9 @@ class ExtensionManager {
      */
     getDeviceExtensionsList () {
         return new Promise(resolve => {
+            if (!shouldUseLocalResourcesServer()) {
+                return resolve();
+            }
             fetch(`${localResourcesServerUrl}extensions/${formatMessage.setup().locale}.json`)
                 .then(response => response.json())
                 .then(extensions => {
