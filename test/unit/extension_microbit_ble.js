@@ -3,15 +3,18 @@ const Scratch3MicroBitBlocks = require('../../src/extensions/scratch3_microbit_b
 
 const makeExtension = pinValues => {
     const setPinValueCalls = [];
+    const clearPinConfigCalls = [];
     const runtime = {
         registerPeripheralExtension: () => {}
     };
     const extension = new Scratch3MicroBitBlocks(runtime);
     extension._peripheral = {
         _checkPinState: pin => pinValues[pin],
-        setPinValue: (pin, value) => setPinValueCalls.push({pin, value})
+        setPinValue: (pin, value) => setPinValueCalls.push({pin, value}),
+        clearPinConfig: () => clearPinConfigCalls.push(true)
     };
     extension.setPinValueCalls = setPinValueCalls;
+    extension.clearPinConfigCalls = clearPinConfigCalls;
     return extension;
 };
 
@@ -59,19 +62,19 @@ test('microbit BLE pin blocks handle invalid pins', t => {
     t.end();
 });
 
-test('microbit BLE sets valid pin values', t => {
+test('microbit BLE sets valid pin values', async t => {
     const extension = makeExtension([0, 0, 0]);
 
-    extension.setPinValue({PIN: '0', VALUE: '0'});
-    extension.setPinValue({PIN: '1', VALUE: '1'});
-    extension.setPinValue({PIN: '2', VALUE: 2});
+    await extension.setPinValue({PIN: '0', VALUE: '0'});
+    await extension.setPinValue({PIN: '1', VALUE: '1'});
+    await extension.setPinValue({PIN: '2', VALUE: 2});
 
     t.same(extension.setPinValueCalls, [
         {pin: 0, value: 0},
         {pin: 1, value: 1},
         {pin: 2, value: 1}
     ]);
-    t.end();
+    t.same(extension.clearPinConfigCalls, [true]);
 });
 
 test('microbit BLE set pin value ignores invalid pins', t => {
@@ -83,4 +86,25 @@ test('microbit BLE set pin value ignores invalid pins', t => {
 
     t.same(extension.setPinValueCalls, []);
     t.end();
+});
+
+test('microbit BLE set pin value waits for peripheral write', async t => {
+    let resolveWrite;
+    let resolved = false;
+    const extension = makeExtension([0, 0, 0]);
+
+    extension._peripheral.setPinValue = () => new Promise(resolve => {
+        resolveWrite = resolve;
+    });
+
+    const promise = extension.setPinValue({PIN: '0', VALUE: '1'}).then(() => {
+        resolved = true;
+    });
+
+    await Promise.resolve();
+    t.equal(resolved, false);
+
+    resolveWrite();
+    await promise;
+    t.equal(resolved, true);
 });

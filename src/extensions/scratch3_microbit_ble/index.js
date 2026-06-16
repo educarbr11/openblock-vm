@@ -144,6 +144,15 @@ class MicroBit {
          */
         this._busyTimeoutID = null;
 
+        /**
+         * Queue used to serialize BLE writes. The micro:bit Scratch BLE firmware
+         * expects small ordered writes; dropping writes while busy makes pin
+         * toggles inside forever loops unreliable.
+         * @type {Promise}
+         * @private
+         */
+        this._sendQueue = Promise.resolve();
+
         this.reset = this.reset.bind(this);
         this._onConnect = this._onConnect.bind(this);
         this._onMessage = this._onMessage.bind(this);
@@ -177,6 +186,17 @@ class MicroBit {
      */
     setPinValue (pin, value) {
         return this.send(BLECommand.CMD_PIN_CONFIG, new Uint8Array([pin, value]));
+    }
+
+    /**
+     * Clear the Scratch firmware pin/touch configuration. This is a compatibility
+     * fallback for boards still running the official Scratch BLE firmware, where
+     * CMD_PIN_CONFIG is not a real digital write and may leave a pin pulled high.
+     * Dogoblock firmware should ignore this one-byte payload.
+     * @return {Promise} - a Promise that resolves when writing to peripheral.
+     */
+    clearPinConfig () {
+        return this.send(BLECommand.CMD_PIN_CONFIG, new Uint8Array([0]));
     }
 
     /**
@@ -307,22 +327,10 @@ class MicroBit {
      * Send a message to the peripheral BLE socket.
      * @param {number} command - the BLE command hex.
      * @param {Uint8Array} message - the message to write
+     * @return {Promise} - a Promise that resolves when writing to peripheral.
      */
     send (command, message) {
-        if (!this.isConnected()) return;
-        if (this._busy) return;
-
-        // Set a busy flag so that while we are sending a message and waiting for
-        // the response, additional messages are ignored.
-        this._busy = true;
-
-        // Set a timeout after which to reset the busy flag. This is used in case
-        // a BLE message was sent for which we never received a response, because
-        // e.g. the peripheral was turned off after the message was sent. We reset
-        // the busy flag after a while so that it is possible to try again later.
-        this._busyTimeoutID = window.setTimeout(() => {
-            this._busy = false;
-        }, 5000);
+        if (!this.isConnected()) return Promise.resolve();
 
         const output = new Uint8Array(message.length + 1);
         output[0] = command; // attach command to beginning of message
@@ -331,12 +339,14 @@ class MicroBit {
         }
         const data = Base64Util.uint8ArrayToBase64(output);
 
-        this._ble.write(BLEUUID.service, BLEUUID.txChar, data, 'base64', true).then(
-            () => {
-                this._busy = false;
-                window.clearTimeout(this._busyTimeoutID);
-            }
-        );
+        const queuedWrite = this._sendQueue
+            .catch(() => {
+                // Keep the queue alive after a failed BLE write.
+            })
+            .then(() => this._ble.write(BLEUUID.service, BLEUUID.txChar, data, 'base64', true));
+
+        this._sendQueue = queuedWrite.catch(() => {});
+        return queuedWrite;
     }
 
     /**
@@ -1140,13 +1150,18 @@ class Scratch3MicroBitBlocks {
         if (isNaN(pin) || pin < 0 || pin > 2) return;
 
         const value = cast.toNumber(args.VALUE) === 0 ? 0 : 1;
-        this._peripheral.setPinValue(pin, value);
 
-        return new Promise(resolve => {
-            setTimeout(() => {
-                resolve();
-            }, BLESendInterval);
-        });
+        return Promise.resolve(this._peripheral.setPinValue(pin, value))
+            .then(() => {
+                if (value === 0) {
+                    return this._peripheral.clearPinConfig();
+                }
+            })
+            .then(() => new Promise(resolve => {
+                setTimeout(() => {
+                    resolve();
+                }, BLESendInterval);
+            }));
     }
 }
 
