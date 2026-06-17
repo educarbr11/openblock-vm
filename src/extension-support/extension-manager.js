@@ -59,6 +59,9 @@ const builtinDevices = {
 
 const allowedBuiltinExtensionIds = new Set(Object.keys(builtinExtensions));
 const allowedBuiltinDeviceIds = new Set(Object.keys(builtinDevices));
+const allowedDeviceExtensionIds = new Set([
+    'displayLcdMatrix'
+]);
 
 const analysisRealDeviceId = deviceId => {
     if (deviceId && deviceId.indexOf('_') !== -1) {
@@ -435,7 +438,7 @@ class ExtensionManager {
                     // filter unsupported distribution content
                     let filteredExtensions = [];
                     filteredExtensions = extensions.filter(extension => {
-                        if (!allowedBuiltinExtensionIds.has(extension.extensionId)) {
+                        if (!allowedDeviceExtensionIds.has(extension.extensionId)) {
                             return false;
                         }
 
