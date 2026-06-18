@@ -60,7 +60,8 @@ const builtinDevices = {
 const allowedBuiltinExtensionIds = new Set(Object.keys(builtinExtensions));
 const allowedBuiltinDeviceIds = new Set(Object.keys(builtinDevices));
 const allowedDeviceExtensionIds = new Set([
-    'displayLcdMatrix'
+    'displayLcd',
+    'ledMatrix'
 ]);
 
 const analysisRealDeviceId = deviceId => {
