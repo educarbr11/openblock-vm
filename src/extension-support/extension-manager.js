@@ -1,3 +1,4 @@
+/* global process */
 const fetch = require('node-fetch');
 const loadjs = require('loadjs');
 const formatMessage = require('format-message');
@@ -11,6 +12,7 @@ const BlockType = require('./block-type');
 
 // Local resources server address
 const localResourcesServerUrl = 'http://127.0.0.1:20112/';
+const webStaticDeviceExtensionsUrl = '/static/device-extensions/';
 const shouldUseLocalResourcesServer = () => {
     if (typeof process !== 'undefined' && process.env &&
         process.env.OPENBLOCK_LOCAL_RESOURCES === 'true') {
@@ -21,6 +23,7 @@ const shouldUseLocalResourcesServer = () => {
     }
     return false;
 };
+const shouldUseStaticDeviceExtensions = () => !shouldUseLocalResourcesServer();
 
 // These extensions are currently built into the VM repository but should not be loaded at startup.
 // TODO: move these out into a separate repository?
@@ -63,6 +66,52 @@ const allowedDeviceExtensionIds = new Set([
     'displayLcd',
     'ledMatrix'
 ]);
+
+const getStaticDeviceExtensions = () => {
+    const locale = formatMessage.setup().locale || 'en';
+    const isPortuguese = locale.toLowerCase().indexOf('pt') === 0;
+    return [
+        {
+            name: isPortuguese ? 'LCD 16x2' : 'LCD 16x2',
+            extensionId: 'displayLcd',
+            version: '1.0.0',
+            supportDevice: ['arduinoUno', 'arduinoNano', 'arduinoLeonardo'],
+            author: 'Dogoblock',
+            iconURL: 'displayLcd/assets/displayLcd.png',
+            description: isPortuguese ?
+                'Controle um display LCD 16x2 paralelo.' :
+                'Control a 16x2 parallel LCD display.',
+            featured: true,
+            blocks: 'displayLcd/blocks.js',
+            generator: 'displayLcd/generator.js',
+            toolbox: 'displayLcd/toolbox.js',
+            translations: 'displayLcd/translations.js',
+            library: 'displayLcd/lib',
+            official: true,
+            tags: ['display'],
+            helpLink: 'https://wiki.openblock.cc'
+        },
+        {
+            name: isPortuguese ? 'Matriz LED' : 'LED Matrix',
+            extensionId: 'ledMatrix',
+            version: '1.0.0',
+            supportDevice: ['arduinoUno', 'arduinoNano', 'arduinoLeonardo'],
+            author: 'Dogoblock',
+            iconURL: 'ledMatrix/assets/ledMatrix.png',
+            description: isPortuguese ?
+                'Controle matrizes de LED 8x8 e 5x5 MAX7219.' :
+                'Control 8x8 and 5x5 MAX7219 LED matrices.',
+            featured: true,
+            blocks: 'ledMatrix/blocks.js',
+            generator: 'ledMatrix/generator.js',
+            toolbox: 'ledMatrix/toolbox.js',
+            translations: 'ledMatrix/translations.js',
+            official: true,
+            tags: ['display'],
+            helpLink: 'https://wiki.openblock.cc'
+        }
+    ];
+};
 
 const analysisRealDeviceId = deviceId => {
     if (deviceId && deviceId.indexOf('_') !== -1) {
@@ -430,6 +479,18 @@ class ExtensionManager {
      */
     getDeviceExtensionsList () {
         return new Promise(resolve => {
+            if (shouldUseStaticDeviceExtensions()) {
+                const extensions = getStaticDeviceExtensions().map(extension => {
+                    extension.resourceBaseUrl = webStaticDeviceExtensionsUrl;
+                    extension.iconURL = webStaticDeviceExtensionsUrl + extension.iconURL;
+                    if (this.isDeviceExtensionLoaded(extension.extensionId)) {
+                        extension.isLoaded = true;
+                    }
+                    return extension;
+                });
+                this._deviceExtensionsList = extensions;
+                return resolve(this._deviceExtensionsList);
+            }
             if (!shouldUseLocalResourcesServer()) {
                 return resolve();
             }
@@ -452,6 +513,7 @@ class ExtensionManager {
                     });
 
                     extensions = filteredExtensions.map(extension => {
+                        extension.resourceBaseUrl = localResourcesServerUrl;
                         extension.iconURL = localResourcesServerUrl + extension.iconURL;
                         if (this.isDeviceExtensionLoaded(extension.extensionId)) {
                             extension.isLoaded = true;
@@ -502,7 +564,7 @@ class ExtensionManager {
             // If it is a local file, add the localhost address in front
             registerUrls = registerUrls.map(url => {
                 if (!validUrl.isWebUri(url)) {
-                    return localResourcesServerUrl + url;
+                    return (deviceExtension.resourceBaseUrl || localResourcesServerUrl) + url;
                 }
                 return url;
             });

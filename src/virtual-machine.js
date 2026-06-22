@@ -416,6 +416,17 @@ class VirtualMachine extends EventEmitter {
     }
 
     /**
+     * Upload a compiled artifact to the extension's specified peripheral.
+     * @param {string} extensionId - the id of the extension.
+     * @param {string} artifact - the compiled artifact to upload.
+     * @param {?string} encoding - the artifact encoding type.
+     * @return {Function} Returns a function to restore upload artifact to peripheral.
+     */
+    uploadArtifactToPeripheral (extensionId, artifact, encoding = null) {
+        return this.runtime.uploadArtifactToPeripheral(extensionId, artifact, encoding);
+    }
+
+    /**
      * Abort upload process.
      * @param {string} extensionId - the id of the extension.
      * @return {Function} Returns a function to aboart upload code to peripheral.

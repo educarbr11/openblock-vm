@@ -14,7 +14,8 @@ class Serialport extends JSONRPC {
     constructor (runtime, deviceId, peripheralOptions, connectCallback = null, resetCallback = null) {
         super();
 
-        this._socket = runtime.getScratchLinkSocket('SERIALPORT');
+        const socketType = peripheralOptions.connectionType === 'webSerial' ? 'WEB_SERIAL' : 'SERIALPORT';
+        this._socket = runtime.getScratchLinkSocket(socketType);
         this._socket.setOnOpen(this.requestPeripheral.bind(this));
         this._socket.setOnClose(this.handleDisconnectError.bind(this));
         this._socket.setOnError(this._handleRequestError.bind(this));

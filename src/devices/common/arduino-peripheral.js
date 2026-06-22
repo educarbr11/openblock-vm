@@ -83,6 +83,7 @@ class ArduinoPeripheral{
         this._serialport = null;
         this._runtime.registerPeripheralExtension(deviceId, this);
         this._runtime.setRealtimeBaudrate(this.serialConfig.baudRate);
+        this._connectionType = 'link';
 
         /**
          * The id of the peripheral this peripheral belongs to.
@@ -160,6 +161,21 @@ class ArduinoPeripheral{
     }
 
     /**
+     * Called by the runtime when user wants to upload a compiled artifact.
+     * @param {string} artifact - the compiled artifact to upload.
+     * @param {?string} encoding - the artifact encoding type.
+     */
+    uploadArtifact (artifact, encoding = null) {
+        if (this._firmata) {
+            this._firmata.removeAllListeners('reportversion');
+            this._firmata.removeAllListeners('ready');
+            delete this._firmata;
+        }
+
+        this._serialport.upload(artifact, this.diveceOpt, encoding);
+    }
+
+    /**
      * Called by the runtime when user wants to upload realtime firmware to a peripheral.
      */
     uploadFirmware () {
@@ -187,12 +203,15 @@ class ArduinoPeripheral{
      * Called by the runtime when user wants to scan for a peripheral.
      * @param {Array.<string>} pnpidList - the array of pnp id list
      * @param {bool} listAll - wether list all connectable device
+     * @param {string} connectionType - the connection transport type
      */
-    scan (pnpidList, listAll) {
+    scan (pnpidList, listAll, connectionType = 'link') {
         if (this._serialport) {
             this._serialport.disconnect();
         }
+        this._connectionType = connectionType;
         this._serialport = new Serialport(this._runtime, this._originalDeviceId, {
+            connectionType,
             filters: {
                 pnpid: listAll ? ['*'] : (pnpidList ? pnpidList : this.pnpidList)
             }
@@ -404,6 +423,9 @@ class ArduinoPeripheral{
      * @private
      */
     _onConnect () {
+        if (this._connectionType === 'webSerial') {
+            return;
+        }
         this._serialport.read(this._onMessage);
 
         this._startHeartbeat();

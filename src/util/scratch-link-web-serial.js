@@ -22,17 +22,18 @@ class ScratchLinkWebSerial {
             dataBits: 8,
             stopBits: 1
         };
+        this._uploadAbort = false;
     }
 
     static isSupported (type) {
-        if (type !== 'SERIALPORT') return false;
+        if (type !== 'WEB_SERIAL') return false;
         if (typeof navigator === 'undefined' || !navigator.serial) return false;
-        if (typeof navigator.userAgent !== 'string') return false;
-        return navigator.userAgent.indexOf('CrOS') !== -1;
+        if (typeof window !== 'undefined' && window.isSecureContext === false) return false;
+        return true;
     }
 
     open () {
-        if (this._type !== 'SERIALPORT') {
+        if (this._type !== 'WEB_SERIAL') {
             throw new Error(`Unknown Web Serial socket Type: ${this._type}`);
         }
         if (!navigator.serial) {
@@ -133,12 +134,15 @@ class ScratchLinkWebSerial {
         case 'read':
             return this._read();
         case 'upload':
+            return this._upload(params);
         case 'uploadFirmware':
             this._sendRemoteRequest('uploadError', {
-                message: 'Upload is not available with Web Serial on Chromebook. Install the realtime firmware first.'
+                message: 'Firmware upload is not available with Web Serial.'
             });
             return null;
         case 'abortUpload':
+            this._uploadAbort = true;
+            return null;
         case 'getServices':
             return null;
         case 'pingMe':
@@ -364,6 +368,250 @@ class ScratchLinkWebSerial {
             return bytes;
         }
         return new TextEncoder().encode(message);
+    }
+
+    _decodeTextMessage (message, encoding) {
+        if (encoding === 'base64') {
+            return window.atob(message);
+        }
+        if (encoding === 'hex') {
+            let text = '';
+            for (let i = 0; i < message.length; i += 2) {
+                text += String.fromCharCode(parseInt(message.substr(i, 2), 16));
+            }
+            return text;
+        }
+        return message;
+    }
+
+    _upload (params) {
+        this._uploadAbort = false;
+        this._sendRemoteRequest('setUploadAbortEnabled', true);
+        return this._uploadStk500v1(params)
+            .then(() => {
+                this._sendRemoteRequest('setUploadAbortEnabled', false);
+                this._sendRemoteRequest('uploadSuccess', {aborted: false});
+                return null;
+            })
+            .catch(error => {
+                this._sendRemoteRequest('setUploadAbortEnabled', false);
+                if (this._uploadAbort) {
+                    this._sendRemoteRequest('uploadSuccess', {aborted: true});
+                    return null;
+                }
+                this._sendRemoteRequest('uploadError', {
+                    message: error && error.message ? error.message : String(error)
+                });
+                throw error;
+            });
+    }
+
+    _uploadStk500v1 (params) {
+        const hex = this._decodeTextMessage(params.message, params.encoding);
+        const config = params.config || {};
+        const fqbn = config.fqbn || '';
+        if (!/arduino:avr:(uno|nano)/.test(fqbn)) {
+            throw new Error('Web Serial upload currently supports only Arduino Uno and Nano.');
+        }
+        if (!this._port) {
+            throw new Error('Serial port is not connected');
+        }
+
+        const uploadBaudRate = fqbn.indexOf('nano') === -1 ? 115200 : 57600;
+        const pages = this._hexToPages(hex, 128);
+        const port = this._port;
+        this._sendUploadStdout('Compilado recebido. Iniciando gravação Web Serial...\n');
+
+        return this._disconnectPort()
+            .then(() => this._sleep(250))
+            .then(() => port.open({
+                baudRate: uploadBaudRate,
+                dataBits: 8,
+                stopBits: 1
+            }))
+            .then(() => {
+                this._port = port;
+                this._portId = this._portId || 'webserial:upload';
+                return this._resetAvrBootloader(port);
+            })
+            .then(() => this._createStk500Session(port))
+            .then(session => this._syncStk500(session)
+                .then(() => this._programPages(session, pages))
+                .then(() => this._leaveProgrammingMode(session))
+                .finally(() => session.close())
+            )
+            .then(() => {
+                this._sendUploadStdout('Gravação concluída.\n');
+            });
+    }
+
+    _resetAvrBootloader (port) {
+        if (!port.setSignals) {
+            return this._sleep(500);
+        }
+        return port.setSignals({dataTerminalReady: false})
+            .catch(() => null)
+            .then(() => this._sleep(50))
+            .then(() => port.setSignals({dataTerminalReady: true}).catch(() => null))
+            .then(() => this._sleep(350));
+    }
+
+    _createStk500Session (port) {
+        const writer = port.writable.getWriter();
+        const reader = port.readable.getReader();
+        const readBuffer = [];
+        const readByte = (timeoutMs = 1000) => {
+            if (readBuffer.length > 0) {
+                return Promise.resolve(readBuffer.shift());
+            }
+            let timeoutId = null;
+            return Promise.race([
+                reader.read().then(result => {
+                    if (result.done || !result.value) {
+                        throw new Error('Serial port closed during upload');
+                    }
+                    for (let i = 0; i < result.value.length; i++) {
+                        readBuffer.push(result.value[i]);
+                    }
+                    return readBuffer.shift();
+                }),
+                new Promise((resolve, reject) => {
+                    timeoutId = window.setTimeout(
+                        () => reject(new Error('Timed out waiting for bootloader response')),
+                        timeoutMs
+                    );
+                })
+            ]).finally(() => {
+                if (timeoutId) window.clearTimeout(timeoutId);
+            });
+        };
+        const write = bytes => {
+            if (this._uploadAbort) {
+                throw new Error('Upload aborted');
+            }
+            return writer.write(new Uint8Array(bytes));
+        };
+        const expectOk = () => readByte()
+            .then(insync => {
+                if (insync !== 0x14) {
+                    throw new Error(`Unexpected bootloader response: 0x${insync.toString(16)}`);
+                }
+                return readByte();
+            })
+            .then(ok => {
+                if (ok !== 0x10) {
+                    throw new Error(`Bootloader command failed: 0x${ok.toString(16)}`);
+                }
+                return null;
+            });
+        return {
+            write,
+            expectOk,
+            close: () => {
+                try {
+                    reader.releaseLock();
+                } catch (e) {
+                    // Ignore release errors.
+                }
+                try {
+                    writer.releaseLock();
+                } catch (e) {
+                    // Ignore release errors.
+                }
+            }
+        };
+    }
+
+    _syncStk500 (session) {
+        const attempt = retries => session.write([0x30, 0x20])
+            .then(() => session.expectOk())
+            .catch(error => {
+                if (retries <= 0) throw error;
+                return this._sleep(200).then(() => attempt(retries - 1));
+            });
+        this._sendUploadStdout('Sincronizando com bootloader...\n');
+        return attempt(12);
+    }
+
+    _programPages (session, pages) {
+        let sequence = Promise.resolve();
+        pages.forEach((page, index) => {
+            sequence = sequence.then(() => {
+                const wordAddress = page.address >> 1;
+                const percent = Math.round((index / pages.length) * 100);
+                this._sendUploadStdout(`Gravando ${percent}%\n`);
+                return session.write([
+                    0x55,
+                    wordAddress & 0xFF,
+                    (wordAddress >> 8) & 0xFF,
+                    0x20
+                ])
+                    .then(() => session.expectOk())
+                    .then(() => session.write([
+                        0x64,
+                        (page.data.length >> 8) & 0xFF,
+                        page.data.length & 0xFF,
+                        0x46
+                    ].concat(Array.prototype.slice.call(page.data), [0x20])))
+                    .then(() => session.expectOk());
+            });
+        });
+        return sequence.then(() => this._sendUploadStdout('Gravando 100%\n'));
+    }
+
+    _leaveProgrammingMode (session) {
+        return session.write([0x51, 0x20])
+            .then(() => session.expectOk())
+            .catch(() => null);
+    }
+
+    _hexToPages (hex, pageSize) {
+        const bytes = [];
+        let upperAddress = 0;
+        let highest = 0;
+        hex.split(/\r?\n/).forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            if (trimmed.charAt(0) !== ':') {
+                throw new Error('Invalid Intel HEX file');
+            }
+            const length = parseInt(trimmed.substr(1, 2), 16);
+            const address = parseInt(trimmed.substr(3, 4), 16);
+            const type = parseInt(trimmed.substr(7, 2), 16);
+            if (type === 0x00) {
+                const base = upperAddress + address;
+                for (let i = 0; i < length; i++) {
+                    const value = parseInt(trimmed.substr(9 + (i * 2), 2), 16);
+                    bytes[base + i] = value;
+                    highest = Math.max(highest, base + i + 1);
+                }
+            } else if (type === 0x01) {
+                return;
+            } else if (type === 0x04) {
+                upperAddress = parseInt(trimmed.substr(9, 4), 16) << 16;
+            }
+        });
+        const pages = [];
+        const end = Math.ceil(highest / pageSize) * pageSize;
+        for (let address = 0; address < end; address += pageSize) {
+            const page = new Uint8Array(pageSize);
+            for (let i = 0; i < pageSize; i++) {
+                page[i] = typeof bytes[address + i] === 'number' ? bytes[address + i] : 0xFF;
+            }
+            pages.push({address, data: page});
+        }
+        if (pages.length === 0) {
+            throw new Error('No flash data found in compiled artifact');
+        }
+        return pages;
+    }
+
+    _sendUploadStdout (message) {
+        this._sendRemoteRequest('uploadStdout', {message});
+    }
+
+    _sleep (ms) {
+        return new Promise(resolve => window.setTimeout(resolve, ms));
     }
 
     _toBase64 (bytes) {

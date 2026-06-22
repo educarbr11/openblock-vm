@@ -1918,6 +1918,21 @@ class Runtime extends EventEmitter {
     }
 
     /**
+     * Upload a compiled artifact to the extension's specified peripheral.
+     * @param {string} deviceId - the id of the device.
+     * @param {string} artifact - the compiled artifact to upload.
+     * @param {?string} encoding - the artifact encoding type.
+     */
+    uploadArtifactToPeripheral (deviceId, artifact, encoding = null) {
+        deviceId = this.analysisRealDeviceId(deviceId);
+
+        if (this.peripheralExtensions[deviceId] &&
+            this.peripheralExtensions[deviceId].uploadArtifact) {
+            this.peripheralExtensions[deviceId].uploadArtifact(artifact, encoding);
+        }
+    }
+
+    /**
      * Abort upload process.
      * @param {string} deviceId - the id of the extension.
      */
