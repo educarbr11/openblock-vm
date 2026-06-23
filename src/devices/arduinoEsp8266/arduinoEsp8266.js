@@ -731,15 +731,18 @@ class OpenBlockArduinoEsp8266Device {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
                     },
                     digitalPins: {
+                        acceptReporters: true,
                         items: this.DIGITAL_PINS_MENU
                     },
                     analogPins: {
+                        acceptReporters: true,
                         items: this.ANALOG_PINS_MENU
                     },
                     level: {
@@ -747,9 +750,11 @@ class OpenBlockArduinoEsp8266Device {
                         items: this.LEVEL_MENU
                     },
                     pwmPins: {
+                        acceptReporters: true,
                         items: this.PWM_AND_INTERRUPT_PINS_MENU
                     },
                     interruptPins: {
+                        acceptReporters: true,
                         items: this.PWM_AND_INTERRUPT_PINS_MENU
                     },
                     interruptMode: {

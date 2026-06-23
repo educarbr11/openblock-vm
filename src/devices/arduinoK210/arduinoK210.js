@@ -756,6 +756,7 @@ class OpenBlockArduinoK210Device {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
@@ -883,6 +884,7 @@ class OpenBlockArduinoK210Device {
                         items: this.SERIAL_NO_MENU
                     },
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     eol: {

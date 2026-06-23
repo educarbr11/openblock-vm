@@ -593,6 +593,68 @@ class ArduinoPeripheral{
             this._firmata.servoWrite(pin, value);
         }
     }
+
+    /**
+     * Play a buzzer tone for a fixed number of seconds.
+     * @param {PIN} pin - the buzzer pin.
+     * @param {number|string} frequency - the tone frequency.
+     * @param {number|string} seconds - the tone duration in seconds.
+     * @return {Promise} - resolves after the tone is stopped.
+     */
+    playToneForSeconds (pin, frequency, seconds) {
+        if (this.isReady()) {
+            pin = this.parsePin(pin);
+            frequency = parseInt(frequency, 10);
+            seconds = parseFloat(seconds);
+            if (isNaN(frequency) || frequency < 0) {
+                frequency = 0;
+            }
+            if (isNaN(seconds) || seconds < 0) {
+                seconds = 0;
+            }
+            return new Promise(resolve => {
+                this._firmata.buzzerTone(pin, frequency);
+                window.setTimeout(() => {
+                    this._firmata.buzzerNoTone(pin);
+                    resolve();
+                }, seconds * 1000);
+            });
+        }
+        return Promise.resolve();
+    }
+
+    /**
+     * Stop a buzzer tone.
+     * @param {PIN} pin - the buzzer pin.
+     */
+    stopTone (pin) {
+        if (this.isReady()) {
+            pin = this.parsePin(pin);
+            this._firmata.buzzerNoTone(pin);
+        }
+    }
+
+    /**
+     * Read distance from HC-SR04 compatible ultrasonic sensor.
+     * @param {PIN} trigPin - trigger pin.
+     * @param {PIN} echoPin - echo pin.
+     * @param {string} unit - CM or INC.
+     * @return {Promise} - resolves with the distance.
+     */
+    readUltrasonicDistance (trigPin, echoPin, unit) {
+        if (this.isReady()) {
+            trigPin = this.parsePin(trigPin);
+            echoPin = this.parsePin(echoPin);
+            unit = unit === 'INC' ? 1 : 0;
+            return new Promise(resolve => {
+                this._firmata.sonarRead(trigPin, echoPin, unit, value => resolve(value));
+                window.setTimeout(() => {
+                    resolve(0);
+                }, FrimataReadTimeout);
+            });
+        }
+        return Promise.resolve(0);
+    }
 }
 
 module.exports = ArduinoPeripheral;

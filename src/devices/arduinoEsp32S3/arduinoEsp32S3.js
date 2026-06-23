@@ -867,12 +867,14 @@ class OpenBlockArduinoEsp32S3Device {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
                     },
                     analogPins: {
+                        acceptReporters: true,
                         items: this.ANALOG_PINS_MENU
                     },
                     level: {
@@ -880,6 +882,7 @@ class OpenBlockArduinoEsp32S3Device {
                         items: this.LEVEL_MENU
                     },
                     touchPins: {
+                        acceptReporters: true,
                         items: this.TOUCH_PINS_MENU
                     },
                     interruptMode: {

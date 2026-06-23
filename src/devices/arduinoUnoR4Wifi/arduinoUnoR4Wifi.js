@@ -102,6 +102,60 @@ const DataType = {
     String: 'STRING'
 };
 
+const Note = {
+    C3: '131',
+    Db3: '139',
+    D3: '147',
+    Eb3: '156',
+    E3: '165',
+    F3: '175',
+    Gb3: '185',
+    G3: '196',
+    Ab3: '208',
+    A3: '220',
+    Bb3: '233',
+    B3: '247',
+    C4: '262',
+    Db4: '277',
+    D4: '294',
+    Eb4: '311',
+    E4: '330',
+    F4: '349',
+    Gb4: '370',
+    G4: '392',
+    Ab4: '415',
+    A4: '440',
+    Bb4: '466',
+    B4: '494',
+    C5: '523',
+    Db5: '554',
+    D5: '587',
+    Eb5: '622',
+    E5: '659',
+    F5: '698',
+    Gb5: '740',
+    G5: '784',
+    Ab5: '831',
+    A5: '880',
+    Bb5: '932',
+    B5: '988'
+};
+
+const BeatTime = {
+    One: '1',
+    Half: '0.5',
+    Quarter: '0.25',
+    Eighth: '0.125',
+    Sixteenth: '0.0625',
+    Double: '2',
+    Quadruple: '4'
+};
+
+const DistanceUnit = {
+    Cm: 'CM',
+    Inch: 'INC'
+};
+
 /**
  * Manage communication with a Arduino Uno R4 WiFi peripheral over a OpenBlock Link client socket.
  */
@@ -445,6 +499,79 @@ class OpenBlockArduinoUnoR4WifiDevice {
             }
         ];
     }
+    get NOTE_MENU () {
+        return [
+            {text: 'C3', value: Note.C3},
+            {text: 'C#3', value: Note.Db3},
+            {text: 'D3', value: Note.D3},
+            {text: 'D#3', value: Note.Eb3},
+            {text: 'E3', value: Note.E3},
+            {text: 'F3', value: Note.F3},
+            {text: 'F#3', value: Note.Gb3},
+            {text: 'G3', value: Note.G3},
+            {text: 'G#3', value: Note.Ab3},
+            {text: 'A3', value: Note.A3},
+            {text: 'A#3', value: Note.Bb3},
+            {text: 'B3', value: Note.B3},
+            {text: 'C4', value: Note.C4},
+            {text: 'C#4', value: Note.Db4},
+            {text: 'D4', value: Note.D4},
+            {text: 'D#4', value: Note.Eb4},
+            {text: 'E4', value: Note.E4},
+            {text: 'F4', value: Note.F4},
+            {text: 'F#4', value: Note.Gb4},
+            {text: 'G4', value: Note.G4},
+            {text: 'G#4', value: Note.Ab4},
+            {text: 'A4', value: Note.A4},
+            {text: 'A#4', value: Note.Bb4},
+            {text: 'B4', value: Note.B4},
+            {text: 'C5', value: Note.C5},
+            {text: 'C#5', value: Note.Db5},
+            {text: 'D5', value: Note.D5},
+            {text: 'D#5', value: Note.Eb5},
+            {text: 'E5', value: Note.E5},
+            {text: 'F5', value: Note.F5},
+            {text: 'F#5', value: Note.Gb5},
+            {text: 'G5', value: Note.G5},
+            {text: 'G#5', value: Note.Ab5},
+            {text: 'A5', value: Note.A5},
+            {text: 'A#5', value: Note.Bb5},
+            {text: 'B5', value: Note.B5}
+        ];
+    }
+
+    get BEAT_TIME_MENU () {
+        return [
+            {text: '1', value: BeatTime.One},
+            {text: '1/2', value: BeatTime.Half},
+            {text: '1/4', value: BeatTime.Quarter},
+            {text: '1/8', value: BeatTime.Eighth},
+            {text: '1/16', value: BeatTime.Sixteenth},
+            {text: '2', value: BeatTime.Double},
+            {text: '4', value: BeatTime.Quadruple}
+        ];
+    }
+
+    get DISTANCE_UNIT_MENU () {
+        return [
+            {
+                text: formatMessage({
+                    id: 'arduinoUnoR4Wifi.distanceUnitMenu.cm',
+                    default: 'cm',
+                    description: 'label for centimeters unit'
+                }),
+                value: DistanceUnit.Cm
+            },
+            {
+                text: formatMessage({
+                    id: 'arduinoUnoR4Wifi.distanceUnitMenu.inch',
+                    default: 'inch',
+                    description: 'label for inches unit'
+                }),
+                value: DistanceUnit.Inch
+            }
+        ];
+    }
 
     get DATA_TYPE_MENU () {
         return [
@@ -630,7 +757,100 @@ class OpenBlockArduinoUnoR4WifiDevice {
                     },
                     '---',
                     {
-
+                        opcode: 'playToneForSeconds',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Wifi.pins.playToneForSeconds',
+                            default: 'play sound on pin [PIN] note [NOTE] for [SECONDS] seconds',
+                            description: 'arduinoUnoR4Wifi play tone for seconds'
+                        }),
+                        blockType: BlockType.COMMAND,
+                        arguments: {
+                            PIN: {
+                                type: ArgumentType.STRING,
+                                menu: 'pins',
+                                defaultValue: Pins.D9
+                            },
+                            NOTE: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'note',
+                                defaultValue: Note.C4
+                            },
+                            SECONDS: {
+                                type: ArgumentType.NUMBER,
+                                defaultValue: '0.5'
+                            }
+                        }
+                    },
+                    {
+                        opcode: 'playToneForBeat',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Wifi.pins.playToneForBeat',
+                            default: 'play sound on pin [PIN] note [NOTE] for [BEAT] beat',
+                            description: 'arduinoUnoR4Wifi play tone for beat'
+                        }),
+                        blockType: BlockType.COMMAND,
+                        arguments: {
+                            PIN: {
+                                type: ArgumentType.STRING,
+                                menu: 'pins',
+                                defaultValue: Pins.D9
+                            },
+                            NOTE: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'note',
+                                defaultValue: Note.C4
+                            },
+                            BEAT: {
+                                type: ArgumentType.STRING,
+                                menu: 'beatTime',
+                                defaultValue: BeatTime.Half
+                            }
+                        }
+                    },
+                    {
+                        opcode: 'stopTone',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Wifi.pins.stopTone',
+                            default: 'stop sound on pin [PIN]',
+                            description: 'arduinoUnoR4Wifi stop tone'
+                        }),
+                        blockType: BlockType.COMMAND,
+                        arguments: {
+                            PIN: {
+                                type: ArgumentType.STRING,
+                                menu: 'pins',
+                                defaultValue: Pins.D9
+                            }
+                        }
+                    },
+                    {
+                        opcode: 'readUltrasonicDistance',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Wifi.pins.readUltrasonicDistance',
+                            default: 'read ultrasonic distance TRIG [TRIG] ECHO [ECHO] in [UNIT]',
+                            description: 'arduinoUnoR4Wifi read ultrasonic distance'
+                        }),
+                        blockType: BlockType.REPORTER,
+                        arguments: {
+                            TRIG: {
+                                type: ArgumentType.STRING,
+                                menu: 'pins',
+                                defaultValue: Pins.D9
+                            },
+                            ECHO: {
+                                type: ArgumentType.STRING,
+                                menu: 'pins',
+                                defaultValue: Pins.D10
+                            },
+                            UNIT: {
+                                type: ArgumentType.STRING,
+                                menu: 'distanceUnit',
+                                defaultValue: DistanceUnit.Cm
+                            }
+                        }
+                    },
+                    '---',
+                    {
                         opcode: 'attachInterrupt',
                         text: formatMessage({
                             id: 'arduinoUnoR4Wifi.pins.attachInterrupt',
@@ -673,12 +893,14 @@ class OpenBlockArduinoUnoR4WifiDevice {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
                     },
                     analogPins: {
+                        acceptReporters: true,
                         items: this.ANALOG_PINS_MENU
                     },
                     level: {
@@ -686,13 +908,25 @@ class OpenBlockArduinoUnoR4WifiDevice {
                         items: this.LEVEL_MENU
                     },
                     pwmPins: {
+                        acceptReporters: true,
                         items: this.PWM_PINS_MENU
                     },
                     interruptPins: {
+                        acceptReporters: true,
                         items: this.INTERRUPT_PINS_MENU
                     },
                     interruptMode: {
                         items: this.INTERRUP_MODE_MENU
+                    },
+                    note: {
+                        acceptReporters: true,
+                        items: this.NOTE_MENU
+                    },
+                    beatTime: {
+                        items: this.BEAT_TIME_MENU
+                    },
+                    distanceUnit: {
+                        items: this.DISTANCE_UNIT_MENU
                     }
                 }
             },
@@ -1066,6 +1300,44 @@ class OpenBlockArduinoUnoR4WifiDevice {
         this._peripheral.setServoOutput(args.PIN, args.OUT);
         return Promise.resolve();
     }
+
+    /**
+     * Play buzzer tone for seconds.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the tone is done.
+     */
+    playToneForSeconds (args) {
+        return this._peripheral.playToneForSeconds(args.PIN, args.NOTE, args.SECONDS);
+    }
+
+    /**
+     * Play buzzer tone for musical beat length. One beat is 0.5 seconds.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the tone is done.
+     */
+    playToneForBeat (args) {
+        return this._peripheral.playToneForSeconds(args.PIN, args.NOTE, parseFloat(args.BEAT) * 0.5);
+    }
+
+    /**
+     * Stop buzzer tone.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the tone is stopped.
+     */
+    stopTone (args) {
+        this._peripheral.stopTone(args.PIN);
+        return Promise.resolve();
+    }
+
+    /**
+     * Read ultrasonic distance.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves with distance.
+     */
+    readUltrasonicDistance (args) {
+        return this._peripheral.readUltrasonicDistance(args.TRIG, args.ECHO, args.UNIT);
+    }
+
 }
 
 module.exports = OpenBlockArduinoUnoR4WifiDevice;

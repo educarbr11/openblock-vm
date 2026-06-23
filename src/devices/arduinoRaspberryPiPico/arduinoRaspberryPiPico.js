@@ -712,12 +712,14 @@ class OpenBlockArduinoRaspberryPiPicoDevice {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
                     },
                     analogPins: {
+                        acceptReporters: true,
                         items: this.ANALOG_PINS_MENU
                     },
                     level: {

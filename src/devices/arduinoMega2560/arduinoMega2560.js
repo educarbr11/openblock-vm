@@ -1025,12 +1025,14 @@ class OpenBlockArduinoMega2560Device {
                 ],
                 menus: {
                     pins: {
+                        acceptReporters: true,
                         items: this.PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
                     },
                     analogPins: {
+                        acceptReporters: true,
                         items: this.ANALOG_PINS_MENU
                     },
                     level: {
@@ -1038,9 +1040,11 @@ class OpenBlockArduinoMega2560Device {
                         items: this.LEVEL_MENU
                     },
                     pwmPins: {
+                        acceptReporters: true,
                         items: this.PWM_PINS_MENU
                     },
                     interruptPins: {
+                        acceptReporters: true,
                         items: this.INTERRUPT_PINS_MENU
                     },
                     interruptMode: {
