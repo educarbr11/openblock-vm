@@ -140,6 +140,7 @@ class ArduinoPeripheral{
         this._startHeartbeat = this._startHeartbeat.bind(this);
         this._listenHeartbeat = this._listenHeartbeat.bind(this);
         this._handleProgramModeUpdate = this._handleProgramModeUpdate.bind(this);
+        this._resumeRealtimeCommunication = this._resumeRealtimeCommunication.bind(this);
     }
 
     /**
@@ -171,6 +172,11 @@ class ArduinoPeripheral{
             this._firmata.removeAllListeners('ready');
             delete this._firmata;
         }
+        if (this._firmataReadyTimeoutID) {
+            window.clearTimeout(this._firmataReadyTimeoutID);
+            this._firmataReadyTimeoutID = null;
+        }
+        this._stopHeartbeat();
 
         this._serialport.upload(artifact, this.diveceOpt, encoding);
     }
@@ -259,7 +265,10 @@ class ArduinoPeripheral{
         }
         this._stopHeartbeat();
         this._runtime.removeListener(this._runtime.constructor.PROGRAM_MODE_UPDATE, this._handleProgramModeUpdate);
-        this._runtime.removeListener(this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, this._startHeartbeat);
+        this._runtime.removeListener(
+            this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS,
+            this._resumeRealtimeCommunication
+        );
     }
 
     /**
@@ -423,15 +432,20 @@ class ArduinoPeripheral{
      * @private
      */
     _onConnect () {
-        if (this._connectionType === 'webSerial') {
-            return;
-        }
+        this._resumeRealtimeCommunication();
+
+        this._runtime.on(this._runtime.constructor.PROGRAM_MODE_UPDATE, this._handleProgramModeUpdate);
+        this._runtime.on(this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, this._resumeRealtimeCommunication);
+    }
+
+    /**
+     * Resume realtime serial reading and Firmata heartbeat after connect/upload.
+     * @private
+     */
+    _resumeRealtimeCommunication () {
         this._serialport.read(this._onMessage);
 
         this._startHeartbeat();
-
-        this._runtime.on(this._runtime.constructor.PROGRAM_MODE_UPDATE, this._handleProgramModeUpdate);
-        this._runtime.on(this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, this._startHeartbeat);
     }
 
     /**

@@ -137,7 +137,7 @@ class ScratchLinkWebSerial {
             return this._upload(params);
         case 'uploadFirmware':
             this._sendRemoteRequest('uploadError', {
-                message: 'Firmware upload is not available with Web Serial.'
+                message: 'Firmware upload with Web Serial must download the firmware from Dogoblock API first.'
             });
             return null;
         case 'abortUpload':
@@ -420,6 +420,7 @@ class ScratchLinkWebSerial {
         const uploadBaudRate = fqbn.indexOf('nano') === -1 ? 115200 : 57600;
         const pages = this._hexToPages(hex, 128);
         const port = this._port;
+        const portId = this._portId;
         this._sendUploadStdout('Compilado recebido. Iniciando gravação Web Serial...\n');
 
         return this._disconnectPort()
@@ -431,7 +432,7 @@ class ScratchLinkWebSerial {
             }))
             .then(() => {
                 this._port = port;
-                this._portId = this._portId || 'webserial:upload';
+                this._portId = portId || 'webserial:upload';
                 return this._resetAvrBootloader(port);
             })
             .then(() => this._createStk500Session(port))
@@ -442,6 +443,20 @@ class ScratchLinkWebSerial {
             )
             .then(() => {
                 this._sendUploadStdout('Gravação concluída.\n');
+                return this._reopenAfterUpload(port, portId);
+            });
+    }
+
+    _reopenAfterUpload (port, portId) {
+        this._sendUploadStdout('Reiniciando comunicação realtime...\n');
+        return port.close()
+            .catch(() => null)
+            .then(() => this._sleep(1200))
+            .then(() => port.open(this._serialOptions))
+            .then(() => {
+                this._port = port;
+                this._portId = portId || this._portId || 'webserial:realtime';
+                return null;
             });
     }
 
