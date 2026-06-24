@@ -291,7 +291,7 @@ class BLE extends JSONRPC {
         }
 
         this._runtime.emit(this._runtime.constructor.PERIPHERAL_CONNECTION_LOST_ERROR, {
-            message: `Scratch lost connection to`,
+            message: `DoGo Block perdeu a conexão com`,
             deviceId: this._deviceId
         });
     }
@@ -300,7 +300,7 @@ class BLE extends JSONRPC {
         // log.error(`BLE error: ${JSON.stringify(e)}`);
 
         this._runtime.emit(this._runtime.constructor.PERIPHERAL_REQUEST_ERROR, {
-            message: `Scratch lost connection to`,
+            message: `DoGo Block perdeu a conexão com`,
             deviceId: this._deviceId
         });
     }

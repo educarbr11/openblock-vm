@@ -31,6 +31,7 @@ class Serialport extends JSONRPC {
         this._discoverTimeoutID = null;
         this._deviceId = deviceId;
         this._peripheralOptions = peripheralOptions;
+        this._connectionType = peripheralOptions.connectionType || 'link';
         this._runtime = runtime;
 
         this._socket.open();
@@ -104,7 +105,9 @@ class Serialport extends JSONRPC {
             const params = {baudRate};
             return this.sendRemoteRequest('updateBaudrate', params)
                 .catch(e => {
+                    if (this._connectionType === 'webSerial') return null;
                     this.handleDisconnectError(e);
+                    return null;
                 });
         }
     }
@@ -120,8 +123,22 @@ class Serialport extends JSONRPC {
         }
         return this.sendRemoteRequest('read')
             .catch(e => {
+                if (this._connectionType === 'webSerial') return null;
                 this.handleDisconnectError(e);
+                return null;
             });
+    }
+
+    /**
+     * Stop reading without closing the serial connection.
+     * Used when switching from realtime mode to upload/program mode.
+     * @return {Promise} - a promise from the remote stop read request.
+     */
+    stopRead () {
+        if (this._connectionType !== 'webSerial') return Promise.resolve(null);
+        this._onMessage = null;
+        return this.sendRemoteRequest('stopRead')
+            .catch(() => null);
     }
 
     /**
@@ -137,7 +154,9 @@ class Serialport extends JSONRPC {
         }
         return this.sendRemoteRequest('write', params)
             .catch(e => {
+                if (this._connectionType === 'webSerial') return null;
                 this.handleDisconnectError(e);
+                return null;
             });
     }
 
@@ -146,17 +165,23 @@ class Serialport extends JSONRPC {
      * @param {string} message - the code to upload.
      * @param {object} config - the configuration of upload process.
      * @param {string} encoding - the message encoding type.
+     * @param {?object} uploadOptions - additional upload metadata.
      * @return {Promise} - a promise from the remote send request.
      */
-    upload (message, config, encoding = null) {
+    upload (message, config, encoding = null, uploadOptions = null) {
         config.library = this._runtime.getCurrentDeviceExtensionLibrary();
         const params = {message, config};
         if (encoding) {
             params.encoding = encoding;
         }
+        if (uploadOptions) {
+            params.uploadOptions = uploadOptions;
+        }
         return this.sendRemoteRequest('upload', params)
             .catch(e => {
+                if (this._connectionType === 'webSerial') return null;
                 this.handleDisconnectError(e);
+                return null;
             });
     }
 
@@ -168,7 +193,9 @@ class Serialport extends JSONRPC {
     uploadFirmware (config) {
         return this.sendRemoteRequest('uploadFirmware', config)
             .catch(e => {
+                if (this._connectionType === 'webSerial') return null;
                 this.handleDisconnectError(e);
+                return null;
             });
     }
 
@@ -179,7 +206,9 @@ class Serialport extends JSONRPC {
     abortUpload () {
         return this.sendRemoteRequest('abortUpload')
             .catch(e => {
+                if (this._connectionType === 'webSerial') return null;
                 this.handleDisconnectError(e);
+                return null;
             });
     }
 
@@ -232,7 +261,7 @@ class Serialport extends JSONRPC {
             break;
         case 'uploadSuccess':
             this._runtime.emit(
-                this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, params ? params.aborted : false);
+                this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS, params || false);
             break;
         case 'ping':
             return 42;
@@ -260,7 +289,7 @@ class Serialport extends JSONRPC {
         }
 
         this._runtime.emit(this._runtime.constructor.PERIPHERAL_CONNECTION_LOST_ERROR, {
-            message: `Scratch lost connection to`,
+            message: `DoGo Block perdeu a conexão com`,
             deviceId: this._deviceId
         });
     }
@@ -286,7 +315,7 @@ class Serialport extends JSONRPC {
 
     _handleRequestError (/* e */) {
         this._runtime.emit(this._runtime.constructor.PERIPHERAL_REQUEST_ERROR, {
-            message: `Scratch lost connection to`,
+            message: `DoGo Block perdeu a conexão com`,
             deviceId: this._deviceId
         });
     }

@@ -17,6 +17,7 @@ class ScratchLinkWebSerial {
         this._portId = null;
         this._reader = null;
         this._readActive = false;
+        this._readRetryCount = 0;
         this._serialOptions = {
             baudRate: 57600,
             dataBits: 8,
@@ -133,6 +134,8 @@ class ScratchLinkWebSerial {
             return this._write(params);
         case 'read':
             return this._read();
+        case 'stopRead':
+            return this._stopRead();
         case 'upload':
             return this._upload(params);
         case 'uploadFirmware':
@@ -252,6 +255,7 @@ class ScratchLinkWebSerial {
 
     _disconnectPort () {
         this._readActive = false;
+        this._readRetryCount = 0;
         const reader = this._reader;
         this._reader = null;
         const releaseReader = () => {
@@ -278,6 +282,26 @@ class ScratchLinkWebSerial {
             .then(() => {
                 releaseReader();
                 return closePort();
+            });
+    }
+
+    _stopRead () {
+        this._readActive = false;
+        this._readRetryCount = 0;
+        const reader = this._reader;
+        this._reader = null;
+        if (!reader) {
+            return Promise.resolve(null);
+        }
+        return reader.cancel()
+            .catch(() => null)
+            .then(() => {
+                try {
+                    reader.releaseLock();
+                } catch (e) {
+                    // Ignore lock release errors during intentional read stop.
+                }
+                return null;
             });
     }
 
@@ -319,6 +343,7 @@ class ScratchLinkWebSerial {
             return null;
         }
         this._readActive = true;
+        this._readRetryCount = 0;
         this._reader = this._port.readable.getReader();
         this._readLoop();
         return null;
@@ -331,9 +356,13 @@ class ScratchLinkWebSerial {
         this._reader.read()
             .then(result => {
                 if (result.done || !this._readActive) {
+                    if (this._readActive) {
+                        this._recoverReadLoop();
+                    }
                     return;
                 }
                 if (result.value) {
+                    this._readRetryCount = 0;
                     this._sendRemoteRequest('onMessage', {
                         encoding: 'base64',
                         message: this._toBase64(result.value)
@@ -343,12 +372,56 @@ class ScratchLinkWebSerial {
             })
             .catch(error => {
                 if (this._readActive) {
-                    this._sendRemoteRequest('peripheralUnplug', null);
-                    if (this._onError) {
-                        this._onError(error);
-                    }
+                    this._recoverReadLoop(error);
                 }
             });
+    }
+
+    _recoverReadLoop (error = null) {
+        const reader = this._reader;
+        this._reader = null;
+        if (reader) {
+            try {
+                reader.releaseLock();
+            } catch (e) {
+                // Ignore lock release errors after transient read failures.
+            }
+        }
+
+        if (!this._readActive || !this._port || !this._port.readable) {
+            return this._emitReadDisconnect(error);
+        }
+
+        this._readRetryCount++;
+        if (this._readRetryCount > 5) {
+            return this._emitReadDisconnect(error);
+        }
+
+        window.setTimeout(() => {
+            if (!this._readActive || !this._port || !this._port.readable) {
+                return this._emitReadDisconnect(error);
+            }
+            try {
+                this._reader = this._port.readable.getReader();
+                this._readLoop();
+            } catch (e) {
+                this._recoverReadLoop(e);
+            }
+            return null;
+        }, 250);
+        return null;
+    }
+
+    _emitReadDisconnect (error = null) {
+        this._readActive = false;
+        this._readRetryCount = 0;
+        // A Web Serial readable stream can close transiently while Arduino resets
+        // or while the board is running a non-Firmata sketch. Keep the logical
+        // connection open; writes/uploads will surface their own errors.
+        if (error && this._onError) {
+            this._onError(error);
+        }
+        return null;
     }
 
     _decodeMessage (message, encoding) {
@@ -385,12 +458,17 @@ class ScratchLinkWebSerial {
     }
 
     _upload (params) {
+        const uploadOptions = params.uploadOptions || {};
         this._uploadAbort = false;
         this._sendRemoteRequest('setUploadAbortEnabled', true);
         return this._uploadStk500v1(params)
             .then(() => {
                 this._sendRemoteRequest('setUploadAbortEnabled', false);
-                this._sendRemoteRequest('uploadSuccess', {aborted: false});
+                this._sendRemoteRequest('uploadSuccess', {
+                    aborted: false,
+                    firmware: Boolean(uploadOptions.firmware),
+                    resumeRealtime: uploadOptions.resumeRealtime !== false
+                });
                 return null;
             })
             .catch(error => {

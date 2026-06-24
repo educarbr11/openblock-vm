@@ -12,7 +12,7 @@ const Firmata = require('../../lib/firmata/firmata');
  */
 const ConnectFirmataTimeout = formatMessage({
     id: 'arduinoPeripheral.connection.connectFirmataTimeout',
-    default: 'Timeout when try to connect firmata, please download the firmware first',
+    default: 'Nao foi possivel iniciar a comunicacao com o Arduino. Envie o firmware novamente para usar o modo palco.',
     description: 'label for connect firmata timeout'
 });
 
@@ -28,10 +28,22 @@ const FrimataHeartbeatInterval = 1000;
 const FrimataHeartbeatTimeout = 2200;
 
 /**
+ * Web Serial runs through the browser event loop and can briefly stall while
+ * Chrome handles USB reads/writes, especially after an Arduino reset.
+ */
+const WebSerialFirmataHeartbeatTimeout = 6000;
+
+/**
  * A time interval wait (in milliseconds) before reporting to the serialport socket
  * that firmata still hasn't received the ready event.
  */
 const FirmataReadyTimeout = 6500;
+
+/**
+ * Web Serial opening usually resets Uno/Nano. Give Firmata more time to boot
+ * before reporting that realtime firmware is missing.
+ */
+const WebSerialFirmataReadyTimeout = 12000;
 
 /**
  * A time interval to wait deivce report data.
@@ -144,6 +156,41 @@ class ArduinoPeripheral{
     }
 
     /**
+     * Clear pending Firmata ready timeout.
+     * @private
+     */
+    _clearFirmataReadyTimeout () {
+        if (this._firmataReadyTimeoutID) {
+            window.clearTimeout(this._firmataReadyTimeoutID);
+            this._firmataReadyTimeoutID = null;
+        }
+    }
+
+    /**
+     * Dispose Firmata parser/listeners without closing the serial connection.
+     * @private
+     */
+    _disposeFirmata () {
+        if (this._firmata) {
+            this._firmata.removeAllListeners('reportversion');
+            this._firmata.removeAllListeners('ready');
+            delete this._firmata;
+        }
+        this._clearFirmataReadyTimeout();
+        this._stopHeartbeat();
+    }
+
+    /**
+     * Stop Web Serial read loop without treating it as a physical disconnect.
+     * @private
+     */
+    _stopSerialRead () {
+        if (this._serialport && this._serialport.stopRead) {
+            this._serialport.stopRead();
+        }
+    }
+
+    /**
      * Called by the runtime when user wants to upload code to a peripheral.
      * @param {string} code - the code want to upload.
      */
@@ -151,11 +198,7 @@ class ArduinoPeripheral{
         // Delete curent firmata. Otherwise, after uploading a new program in upload mode,
         // when returning to real time mode, since the old fimata service still exists,
         // an RealtimeDisconnectErrorerror will be reported quickly.
-        if (this._firmata) {
-            this._firmata.removeAllListeners('reportversion');
-            this._firmata.removeAllListeners('ready');
-            delete this._firmata;
-        }
+        this._disposeFirmata();
 
         const base64Str = Buffer.from(code).toString('base64');
         this._serialport.upload(base64Str, this.diveceOpt, 'base64');
@@ -165,36 +208,19 @@ class ArduinoPeripheral{
      * Called by the runtime when user wants to upload a compiled artifact.
      * @param {string} artifact - the compiled artifact to upload.
      * @param {?string} encoding - the artifact encoding type.
+     * @param {?object} options - upload options.
      */
-    uploadArtifact (artifact, encoding = null) {
-        if (this._firmata) {
-            this._firmata.removeAllListeners('reportversion');
-            this._firmata.removeAllListeners('ready');
-            delete this._firmata;
-        }
-        if (this._firmataReadyTimeoutID) {
-            window.clearTimeout(this._firmataReadyTimeoutID);
-            this._firmataReadyTimeoutID = null;
-        }
-        this._stopHeartbeat();
+    uploadArtifact (artifact, encoding = null, options = null) {
+        this._disposeFirmata();
 
-        this._serialport.upload(artifact, this.diveceOpt, encoding);
+        this._serialport.upload(artifact, this.diveceOpt, encoding, options);
     }
 
     /**
      * Called by the runtime when user wants to upload realtime firmware to a peripheral.
      */
     uploadFirmware () {
-        if (this._firmata) {
-            this._firmata.removeAllListeners('reportversion');
-            this._firmata.removeAllListeners('ready');
-            delete this._firmata;
-        }
-        if (this._firmataReadyTimeoutID) {
-            window.clearTimeout(this._firmataReadyTimeoutID);
-            this._firmataReadyTimeoutID = null;
-        }
-        this._stopHeartbeat();
+        this._disposeFirmata();
         this._serialport.uploadFirmware(this.diveceOpt);
     }
 
@@ -254,16 +280,7 @@ class ArduinoPeripheral{
      * Reset all the state and timeout/interval ids.
      */
     reset () {
-        if (this._firmata) {
-            this._firmata.removeAllListeners('reportversion');
-            this._firmata.removeAllListeners('ready');
-            delete this._firmata;
-        }
-        if (this._firmataReadyTimeoutID) {
-            window.clearTimeout(this._firmataReadyTimeoutID);
-            this._firmataReadyTimeoutID = null;
-        }
-        this._stopHeartbeat();
+        this._disposeFirmata();
         this._runtime.removeListener(this._runtime.constructor.PROGRAM_MODE_UPDATE, this._handleProgramModeUpdate);
         this._runtime.removeListener(
             this._runtime.constructor.PERIPHERAL_UPLOAD_SUCCESS,
@@ -319,13 +336,18 @@ class ArduinoPeripheral{
      */
     _startHeartbeat () {
         if (this._runtime.isRealtimeMode()) {
+            const heartbeatTimeout = this._connectionType === 'webSerial' ?
+                WebSerialFirmataHeartbeatTimeout : FrimataHeartbeatTimeout;
+            const readyTimeout = this._connectionType === 'webSerial' ?
+                WebSerialFirmataReadyTimeout : FirmataReadyTimeout;
             // eslint-disable-next-line no-negated-condition
             if (!this._firmata) {
                 // Start a timeout to report that firmata did not receive the ready event.
                 // This happens after connecting to a device that is not running the firmata service.
                 this._firmataReadyTimeoutID = window.setTimeout(() => {
+                    if (!this._runtime.isRealtimeMode()) return;
                     this._serialport.handleRealtimeDisconnectError(ConnectFirmataTimeout);
-                }, FirmataReadyTimeout);
+                }, readyTimeout);
 
                 this._firmata = new Firmata(this.send.bind(this));
                 this._firmata.once('ready', () => {
@@ -348,9 +370,10 @@ class ArduinoPeripheral{
 
                     // Start a timer if heartbeat timeout means failed to connect firmata.
                     this._firmataTimeoutID = window.setTimeout(() => {
+                        if (!this._runtime.isRealtimeMode()) return;
                         this._isFirmataConnected = false;
                         this._serialport.handleRealtimeDisconnectError(ConnectFirmataTimeout);
-                    }, FrimataHeartbeatTimeout);
+                    }, heartbeatTimeout);
                 });
             } else {
                 this._stopHeartbeat();
@@ -362,9 +385,10 @@ class ArduinoPeripheral{
 
                 // Start a timer if heartbeat timeout means failed to connect firmata.
                 this._firmataTimeoutID = window.setTimeout(() => {
+                    if (!this._runtime.isRealtimeMode()) return;
                     this._isFirmataConnected = false;
                     this._serialport.handleRealtimeDisconnectError(ConnectFirmataTimeout);
-                }, FrimataHeartbeatTimeout);
+                }, heartbeatTimeout);
             }
         }
     }
@@ -390,16 +414,20 @@ class ArduinoPeripheral{
      * @private
      */
     _listenHeartbeat () {
+        if (!this._runtime.isRealtimeMode()) return;
         if (!this._isFirmataConnected) {
             this._isFirmataConnected = true;
             this._serialport.handleRealtimeConnectSucess();
         }
         // Reset the timeout timer
         window.clearTimeout(this._firmataTimeoutID);
+        const heartbeatTimeout = this._connectionType === 'webSerial' ?
+            WebSerialFirmataHeartbeatTimeout : FrimataHeartbeatTimeout;
         this._firmataTimeoutID = window.setTimeout(() => {
+            if (!this._runtime.isRealtimeMode()) return;
             this._isFirmataConnected = false;
             this._serialport.handleRealtimeDisconnectError(ConnectFirmataTimeout);
-        }, FrimataHeartbeatTimeout);
+        }, heartbeatTimeout);
     }
 
     /**
@@ -409,21 +437,8 @@ class ArduinoPeripheral{
         if (this._runtime.isRealtimeMode()) {
             this._startHeartbeat();
         } else {
-            // If _firmataReadyTimeoutID is still not null when switching to upload mode, it means
-            // that the Firmata protocol has not completed the initial communication, reset the
-            // firmata and wait for the next connection.
-            if (this._firmataReadyTimeoutID) {
-                if (this._firmata) {
-                    this._firmata.removeAllListeners('reportversion');
-                    this._firmata.removeAllListeners('ready');
-                    delete this._firmata;
-                }
-                if (this._firmataReadyTimeoutID) {
-                    window.clearTimeout(this._firmataReadyTimeoutID);
-                    this._firmataReadyTimeoutID = null;
-                }
-            }
-            this._stopHeartbeat();
+            this._disposeFirmata();
+            this._stopSerialRead();
         }
     }
 
@@ -442,10 +457,14 @@ class ArduinoPeripheral{
      * Resume realtime serial reading and Firmata heartbeat after connect/upload.
      * @private
      */
-    _resumeRealtimeCommunication () {
-        this._serialport.read(this._onMessage);
-
+    _resumeRealtimeCommunication (uploadResult = null) {
+        if (uploadResult && typeof uploadResult === 'object' &&
+                uploadResult.resumeRealtime === false) {
+            return;
+        }
         this._startHeartbeat();
+
+        this._serialport.read(this._onMessage);
     }
 
     /**
@@ -455,6 +474,7 @@ class ArduinoPeripheral{
      */
     _onMessage (base64) {
         if (this._runtime.isRealtimeMode()) {
+            if (!this._firmata) return;
             const data = Base64Util.base64ToUint8Array(base64);
             this._firmata.onReciveData(data);
         } else {
