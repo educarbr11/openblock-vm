@@ -201,7 +201,7 @@ class ArduinoPeripheral{
         this._disposeFirmata();
 
         const base64Str = Buffer.from(code).toString('base64');
-        this._serialport.upload(base64Str, this.diveceOpt, 'base64');
+        return this._serialport.upload(base64Str, this.diveceOpt, 'base64');
     }
 
     /**
@@ -213,7 +213,7 @@ class ArduinoPeripheral{
     uploadArtifact (artifact, encoding = null, options = null) {
         this._disposeFirmata();
 
-        this._serialport.upload(artifact, this.diveceOpt, encoding, options);
+        return this._serialport.upload(artifact, this.diveceOpt, encoding, options);
     }
 
     /**

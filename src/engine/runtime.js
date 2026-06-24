@@ -1913,8 +1913,9 @@ class Runtime extends EventEmitter {
         deviceId = this.analysisRealDeviceId(deviceId);
 
         if (this.peripheralExtensions[deviceId]) {
-            this.peripheralExtensions[deviceId].upload(code);
+            return this.peripheralExtensions[deviceId].upload(code);
         }
+        return false;
     }
 
     /**
@@ -1929,8 +1930,9 @@ class Runtime extends EventEmitter {
 
         if (this.peripheralExtensions[deviceId] &&
             this.peripheralExtensions[deviceId].uploadArtifact) {
-            this.peripheralExtensions[deviceId].uploadArtifact(artifact, encoding, options);
+            return this.peripheralExtensions[deviceId].uploadArtifact(artifact, encoding, options);
         }
+        return false;
     }
 
     /**
