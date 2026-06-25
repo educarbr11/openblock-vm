@@ -545,27 +545,6 @@ class OpenBlockArduinoRaspberryPiPico2WDevice {
 
                 blocks: [
                     {
-                        opcode: 'setPinMode',
-                        text: formatMessage({
-                            id: 'arduinoRaspberryPiPico2W.pins.setPinMode',
-                            default: 'set pin [PIN] mode [MODE]',
-                            description: 'arduinoRaspberryPiPico2W set pin mode'
-                        }),
-                        blockType: BlockType.COMMAND,
-                        arguments: {
-                            PIN: {
-                                type: ArgumentType.STRING,
-                                menu: 'pins',
-                                defaultValue: this.DEFAULT_PIN
-                            },
-                            MODE: {
-                                type: ArgumentType.STRING,
-                                menu: 'mode',
-                                defaultValue: Mode.Input
-                            }
-                        }
-                    },
-                    {
                         opcode: 'setDigitalOutput',
                         text: formatMessage({
                             id: 'arduinoRaspberryPiPico2W.pins.setDigitalOutput',

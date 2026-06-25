@@ -638,27 +638,6 @@ class OpenBlockArduinoUnoR4WifiDevice {
 
                 blocks: [
                     {
-                        opcode: 'setPinMode',
-                        text: formatMessage({
-                            id: 'arduinoUnoR4Wifi.pins.setPinMode',
-                            default: 'set pin [PIN] mode [MODE]',
-                            description: 'arduinoUnoR4Wifi set pin mode'
-                        }),
-                        blockType: BlockType.COMMAND,
-                        arguments: {
-                            PIN: {
-                                type: ArgumentType.STRING,
-                                menu: 'pins',
-                                defaultValue: Pins.D0
-                            },
-                            MODE: {
-                                type: ArgumentType.STRING,
-                                menu: 'mode',
-                                defaultValue: Mode.Input
-                            }
-                        }
-                    },
-                    {
                         opcode: 'setDigitalOutput',
                         text: formatMessage({
                             id: 'arduinoUnoR4Wifi.pins.setDigitalOutput',

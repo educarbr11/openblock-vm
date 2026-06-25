@@ -690,27 +690,6 @@ class OpenBlockArduinoEsp32S3Device {
 
                 blocks: [
                     {
-                        opcode: 'setPinMode',
-                        text: formatMessage({
-                            id: 'arduinoEsp32S3.pins.setPinMode',
-                            default: 'set pin [PIN] mode [MODE]',
-                            description: 'arduinoEsp32S3 set pin mode'
-                        }),
-                        blockType: BlockType.COMMAND,
-                        arguments: {
-                            PIN: {
-                                type: ArgumentType.STRING,
-                                menu: 'pins',
-                                defaultValue: Pins.IO1
-                            },
-                            MODE: {
-                                type: ArgumentType.STRING,
-                                menu: 'mode',
-                                defaultValue: Mode.Input
-                            }
-                        }
-                    },
-                    {
                         opcode: 'setDigitalOutput',
                         text: formatMessage({
                             id: 'arduinoEsp32S3.pins.setDigitalOutput',

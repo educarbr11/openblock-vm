@@ -126,6 +126,7 @@ class Keyboard {
         } else if (index > -1) {
             // If already present, remove from the list.
             this._keysPressed.splice(index, 1);
+            this.runtime.emit('KEY_RELEASED', scratchKey);
         }
     }
 

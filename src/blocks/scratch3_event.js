@@ -16,6 +16,15 @@ class Scratch3EventBlocks {
                 KEY_OPTION: 'any'
             });
         });
+
+        this.runtime.on('KEY_RELEASED', key => {
+            this.runtime.startHats('event_whenkeyreleased', {
+                KEY_OPTION: key
+            });
+            this.runtime.startHats('event_whenkeyreleased', {
+                KEY_OPTION: 'any'
+            });
+        });
     }
 
     /**
@@ -37,6 +46,9 @@ class Scratch3EventBlocks {
                 restartExistingThreads: true
             },
             event_whenkeypressed: {
+                restartExistingThreads: false
+            },
+            event_whenkeyreleased: {
                 restartExistingThreads: false
             },
             event_whenthisspriteclicked: {
