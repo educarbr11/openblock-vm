@@ -15,7 +15,19 @@ const ArduinoPeripheral = require('../common/arduino-peripheral');
  */
 const PNPID_LIST = [
     // For chinese clones that use CH340
-    'USB\\VID_1A86&PID_7523'
+    'USB\\VID_1A86&PID_7523',
+    // CH9102 / newer WCH USB-serial adapters
+    'USB\\VID_1A86&PID_55D4',
+    // FTDI USB-serial adapters used by many classic Nano boards
+    'USB\\VID_0403&PID_6001',
+    'USB\\VID_0403&PID_6015',
+    // CP210x USB-serial adapters used by some Nano-compatible boards
+    'USB\\VID_10C4&PID_EA60',
+    // Official Arduino Nano variants
+    'USB\\VID_2341&PID_0010',
+    'USB\\VID_2341&PID_0051',
+    'USB\\VID_2A03&PID_0010',
+    'USB\\VID_2A03&PID_0051'
 ];
 
 /**

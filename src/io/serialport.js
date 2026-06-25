@@ -179,7 +179,7 @@ class Serialport extends JSONRPC {
         }
         return this.sendRemoteRequest('upload', params)
             .catch(e => {
-                if (this._connectionType === 'webSerial') return null;
+                if (this._connectionType === 'webSerial') throw e;
                 this.handleDisconnectError(e);
                 return null;
             });

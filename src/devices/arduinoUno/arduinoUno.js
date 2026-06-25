@@ -186,11 +186,11 @@ class OpenBlockArduinoUnoDevice {
     get PINS_MENU () {
         return [
             {
-                text: '0',
+                text: '0 (RX)',
                 value: Pins.D0
             },
             {
-                text: '1',
+                text: '1 (TX)',
                 value: Pins.D1
             },
             {
@@ -629,7 +629,7 @@ class OpenBlockArduinoUnoDevice {
                             PIN: {
                                 type: ArgumentType.STRING,
                                 menu: 'pins',
-                                defaultValue: Pins.D0
+                                defaultValue: Pins.D13
                             },
                             MODE: {
                                 type: ArgumentType.STRING,

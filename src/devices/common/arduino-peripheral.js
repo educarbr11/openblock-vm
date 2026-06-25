@@ -96,6 +96,8 @@ class ArduinoPeripheral{
         this._runtime.registerPeripheralExtension(deviceId, this);
         this._runtime.setRealtimeBaudrate(this.serialConfig.baudRate);
         this._connectionType = 'link';
+        this._writeQueue = Promise.resolve();
+        this._configuredServoPins = {};
 
         /**
          * The id of the peripheral this peripheral belongs to.
@@ -176,6 +178,7 @@ class ArduinoPeripheral{
             this._firmata.removeAllListeners('ready');
             delete this._firmata;
         }
+        this._configuredServoPins = {};
         this._clearFirmataReadyTimeout();
         this._stopHeartbeat();
     }
@@ -244,6 +247,7 @@ class ArduinoPeripheral{
         this._connectionType = connectionType;
         this._serialport = new Serialport(this._runtime, this._originalDeviceId, {
             connectionType,
+            deviceId: this._deviceId,
             filters: {
                 pnpid: listAll ? ['*'] : (pnpidList ? pnpidList : this.pnpidList)
             }
@@ -316,7 +320,7 @@ class ArduinoPeripheral{
         if (!this.isConnected()) return;
 
         const base64Str = Buffer.from(data).toString('base64');
-        this._serialport.write(base64Str, 'base64');
+        this._writeSerial(base64Str, 'base64');
     }
 
     /**
@@ -327,7 +331,24 @@ class ArduinoPeripheral{
         if (!this.isConnected()) return;
 
         const data = Base64Util.uint8ArrayToBase64(message);
-        this._serialport.write(data, 'base64');
+        this._writeSerial(data, 'base64');
+    }
+
+    /**
+     * Queue Web Serial writes so multi-packet Firmata commands keep order.
+     * @param {string} data - Base64 encoded serial data.
+     * @param {string} encoding - Encoding name.
+     * @private
+     */
+    _writeSerial (data, encoding) {
+        if (this._connectionType !== 'webSerial') {
+            this._serialport.write(data, encoding);
+            return;
+        }
+        this._writeQueue = this._writeQueue
+            .catch(() => null)
+            .then(() => this._serialport.write(data, encoding))
+            .catch(() => null);
     }
 
     /**
@@ -620,10 +641,11 @@ class ArduinoPeripheral{
             if (value > 180) {
                 value = 180;
             }
-            this._firmata.pinMode(pin, this._firmata.MODES.PWM);
-            this._firmata.pwmWrite(pin, value);
-
-            this._firmata.servoConfig(pin, 600, 2400);
+            if (!this._configuredServoPins[pin]) {
+                this._firmata.servoConfig(pin, 600, 2400);
+                this._firmata.pinMode(pin, this._firmata.MODES.SERVO);
+                this._configuredServoPins[pin] = true;
+            }
             this._firmata.servoWrite(pin, value);
         }
     }

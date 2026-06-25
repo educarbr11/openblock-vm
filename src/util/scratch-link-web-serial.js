@@ -159,10 +159,11 @@ class ScratchLinkWebSerial {
     _discover (params) {
         this._ports = {};
         const filters = params.filters || {};
+        const allowAnyPort = params.deviceId === 'arduinoNano';
         return navigator.serial.getPorts()
             .then(ports => {
                 if (ports.length === 0 && navigator.userActivation && navigator.userActivation.isActive) {
-                    return navigator.serial.requestPort(this._makeRequestOptions(filters))
+                    return navigator.serial.requestPort(this._makeRequestOptions(filters, allowAnyPort))
                         .then(port => [port])
                         .catch(error => {
                             if (error && error.name === 'NotFoundError') {
@@ -175,13 +176,16 @@ class ScratchLinkWebSerial {
             })
             .then(ports => {
                 ports
-                    .filter(port => this._matchesFilters(port, filters))
+                    .filter(port => allowAnyPort || this._matchesFilters(port, filters))
                     .forEach(port => this._reportPort(port));
                 return null;
             });
     }
 
-    _makeRequestOptions (filters) {
+    _makeRequestOptions (filters, allowAnyPort = false) {
+        if (allowAnyPort) {
+            return {};
+        }
         if (filters.pnpid && filters.pnpid.includes('*')) {
             return {};
         }
@@ -495,16 +499,43 @@ class ScratchLinkWebSerial {
             throw new Error('Serial port is not connected');
         }
 
-        const uploadBaudRate = fqbn.indexOf('nano') === -1 ? 115200 : 57600;
+        const isNano = fqbn.indexOf('nano') !== -1;
+        const uploadBaudRates = isNano ? [57600, 115200] : [115200];
         const pages = this._hexToPages(hex, 128);
         const port = this._port;
         const portId = this._portId;
         this._sendUploadStdout('Compilado recebido. Iniciando gravação Web Serial...\n');
 
         return this._disconnectPort()
-            .then(() => this._sleep(250))
+            .then(() => this._tryUploadBaudRates(port, portId, pages, uploadBaudRates))
+            .then(() => {
+                this._sendUploadStdout('Gravação concluída.\n');
+                return this._reopenAfterUpload(port, portId);
+            });
+    }
+
+    _tryUploadBaudRates (port, portId, pages, baudRates, index = 0) {
+        const baudRate = baudRates[index];
+        this._sendUploadStdout(`Tentando bootloader em ${baudRate} bps...\n`);
+        return this._uploadWithBaudRate(port, portId, pages, baudRate)
+            .catch(error => this._closeUploadPort(port)
+                .then(() => {
+                    if (index + 1 >= baudRates.length) {
+                        throw error;
+                    }
+                    this._sendUploadStdout(
+                        `Bootloader nao respondeu em ${baudRate} bps. Tentando outro modo...\n`
+                    );
+                    return this._sleep(450)
+                        .then(() => this._tryUploadBaudRates(port, portId, pages, baudRates, index + 1));
+                })
+            );
+    }
+
+    _uploadWithBaudRate (port, portId, pages, baudRate) {
+        return this._sleep(250)
             .then(() => port.open({
-                baudRate: uploadBaudRate,
+                baudRate,
                 dataBits: 8,
                 stopBits: 1
             }))
@@ -518,11 +549,16 @@ class ScratchLinkWebSerial {
                 .then(() => this._programPages(session, pages))
                 .then(() => this._leaveProgrammingMode(session))
                 .finally(() => session.close())
-            )
-            .then(() => {
-                this._sendUploadStdout('Gravação concluída.\n');
-                return this._reopenAfterUpload(port, portId);
-            });
+            );
+    }
+
+    _closeUploadPort (port) {
+        this._port = null;
+        this._portId = null;
+        if (!port) return Promise.resolve(null);
+        return port.close()
+            .catch(() => null)
+            .then(() => null);
     }
 
     _reopenAfterUpload (port, portId) {
@@ -540,13 +576,15 @@ class ScratchLinkWebSerial {
 
     _resetAvrBootloader (port) {
         if (!port.setSignals) {
-            return this._sleep(500);
+            return this._sleep(900);
         }
-        return port.setSignals({dataTerminalReady: false})
+        return port.setSignals({dataTerminalReady: true, requestToSend: true})
             .catch(() => null)
-            .then(() => this._sleep(50))
-            .then(() => port.setSignals({dataTerminalReady: true}).catch(() => null))
-            .then(() => this._sleep(350));
+            .then(() => this._sleep(60))
+            .then(() => port.setSignals({dataTerminalReady: false, requestToSend: false}).catch(() => null))
+            .then(() => this._sleep(120))
+            .then(() => port.setSignals({dataTerminalReady: true, requestToSend: true}).catch(() => null))
+            .then(() => this._sleep(650));
     }
 
     _createStk500Session (port) {
