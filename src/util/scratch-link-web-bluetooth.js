@@ -17,6 +17,7 @@ class ScratchLinkWebBluetooth {
         this._server = null;
         this._services = {};
         this._characteristics = {};
+        this._notificationListeners = {};
     }
 
     static isSupported (type) {
@@ -215,6 +216,7 @@ class ScratchLinkWebBluetooth {
 
     _disconnect () {
         this._characteristics = {};
+        this._notificationListeners = {};
         this._services = {};
         this._server = null;
         if (this._device && this._device.gatt && this._device.gatt.connected) {
@@ -242,7 +244,14 @@ class ScratchLinkWebBluetooth {
     _startNotifications (params) {
         return this._getCharacteristic(params.serviceId, params.characteristicId)
             .then(characteristic => {
-                characteristic.addEventListener('characteristicvaluechanged', event => {
+                const characteristicKey = `${params.serviceId}:${params.characteristicId}`;
+                if (this._notificationListeners[characteristicKey]) {
+                    characteristic.removeEventListener(
+                        'characteristicvaluechanged',
+                        this._notificationListeners[characteristicKey]
+                    );
+                }
+                const listener = event => {
                     const value = event.target.value;
                     const bytes = new Uint8Array(value.buffer.slice(
                         value.byteOffset,
@@ -252,8 +261,30 @@ class ScratchLinkWebBluetooth {
                         encoding: 'base64',
                         message: this._toBase64(bytes)
                     });
-                });
-                return characteristic.startNotifications().then(() => null);
+                };
+                this._notificationListeners[characteristicKey] = listener;
+                characteristic.addEventListener('characteristicvaluechanged', listener);
+                return characteristic.startNotifications()
+                    .then(() => {
+                        if (!characteristic.properties || !characteristic.properties.read) {
+                            return null;
+                        }
+                        return characteristic.readValue()
+                            .then(value => {
+                                const bytes = new Uint8Array(value.buffer.slice(
+                                    value.byteOffset,
+                                    value.byteOffset + value.byteLength
+                                ));
+                                if (bytes.length) {
+                                    this._sendRemoteRequest('characteristicDidChange', {
+                                        encoding: 'base64',
+                                        message: this._toBase64(bytes)
+                                    });
+                                }
+                                return null;
+                            })
+                            .catch(() => null);
+                    });
             });
     }
 

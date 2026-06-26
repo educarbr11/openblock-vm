@@ -30,7 +30,7 @@ const BLECommand = {
  * A time interval to wait (in milliseconds) before reporting to the BLE socket
  * that data has stopped coming from the peripheral.
  */
-const BLETimeout = 4500;
+const BLETimeout = 8000;
 
 /**
  * A time interval to wait (in milliseconds) while a block that sends a BLE message is running.
@@ -351,14 +351,24 @@ class MicroBit {
 
     /**
      * Starts reading data from peripheral after BLE has connected to it.
+     * @return {Promise} resolves after notifications are ready.
      * @private
      */
     _onConnect () {
-        this._ble.read(BLEUUID.service, BLEUUID.rxChar, true, this._onMessage);
-        this._timeoutID = window.setTimeout(
-            () => this._ble.handleDisconnectError(BLEDataStoppedError),
-            BLETimeout
-        );
+        return this._ble.startNotifications(BLEUUID.service, BLEUUID.rxChar, this._onMessage)
+            .then(() => {
+                this._timeoutID = window.setTimeout(
+                    () => this._ble.handleDisconnectError(BLEDataStoppedError),
+                    BLETimeout
+                );
+            })
+            .catch(error => {
+                const message = error && error.message ? error.message : String(error);
+                throw new Error(
+                    `Não foi possível iniciar os dados BLE do micro:bit. ` +
+                    `Reenvie o firmware Dogoblock BLE e tente conectar novamente. Detalhes: ${message}`
+                );
+            });
     }
 
     /**
@@ -369,6 +379,9 @@ class MicroBit {
     _onMessage (base64) {
         // parse data
         const data = Base64Util.base64ToUint8Array(base64);
+        if (data.length < 10) {
+            return;
+        }
 
         this._sensors.tiltX = data[1] | (data[0] << 8);
         if (this._sensors.tiltX > (1 << 15)) this._sensors.tiltX -= (1 << 16);

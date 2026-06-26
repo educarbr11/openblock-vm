@@ -78,9 +78,13 @@ class BLE extends JSONRPC {
     connectPeripheral (id) {
         this.sendRemoteRequest('connect', {peripheralId: id})
             .then(() => {
+                const connectResult = this._connectCallback();
+                return Promise.resolve(connectResult);
+            })
+            .then(() => {
+                if (!this._socket.isOpen()) return;
                 this._connected = true;
                 this._runtime.emit(this._runtime.constructor.PERIPHERAL_CONNECTED);
-                this._connectCallback();
             })
             .catch(e => {
                 this._handleRequestError(e);

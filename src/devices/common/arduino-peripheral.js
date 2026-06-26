@@ -216,7 +216,8 @@ class ArduinoPeripheral{
     uploadArtifact (artifact, encoding = null, options = null) {
         this._disposeFirmata();
 
-        return this._serialport.upload(artifact, this.diveceOpt, encoding, options);
+        const uploadOptions = Object.assign({artifactType: 'compiledArtifact'}, options || {});
+        return this._serialport.upload(artifact, this.diveceOpt, encoding, uploadOptions);
     }
 
     /**
