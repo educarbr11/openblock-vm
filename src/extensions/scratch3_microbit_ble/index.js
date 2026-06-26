@@ -30,7 +30,13 @@ const BLECommand = {
  * A time interval to wait (in milliseconds) before reporting to the BLE socket
  * that data has stopped coming from the peripheral.
  */
-const BLETimeout = 8000;
+const BLETimeout = 15000;
+
+/**
+ * Number of missed sensor packet windows tolerated before treating the
+ * connection as lost. The Link will still report real disconnects immediately.
+ */
+const BLEDataTimeoutLimit = 4;
 
 /**
  * A time interval to wait (in milliseconds) while a block that sends a BLE message is running.
@@ -152,10 +158,12 @@ class MicroBit {
          * @private
          */
         this._sendQueue = Promise.resolve();
+        this._missedDataTimeouts = 0;
 
         this.reset = this.reset.bind(this);
         this._onConnect = this._onConnect.bind(this);
         this._onMessage = this._onMessage.bind(this);
+        this._handleDataTimeout = this._handleDataTimeout.bind(this);
     }
 
     /**
@@ -309,6 +317,8 @@ class MicroBit {
             window.clearTimeout(this._timeoutID);
             this._timeoutID = null;
         }
+        this._missedDataTimeouts = 0;
+        this._sendQueue = Promise.resolve();
     }
 
     /**
@@ -357,8 +367,9 @@ class MicroBit {
     _onConnect () {
         return this._ble.startNotifications(BLEUUID.service, BLEUUID.rxChar, this._onMessage)
             .then(() => {
+                this._missedDataTimeouts = 0;
                 this._timeoutID = window.setTimeout(
-                    () => this._ble.handleDisconnectError(BLEDataStoppedError),
+                    this._handleDataTimeout,
                     BLETimeout
                 );
             })
@@ -398,9 +409,32 @@ class MicroBit {
         this._sensors.gestureState = data[9];
 
         // cancel disconnect timeout and start a new one
+        this._missedDataTimeouts = 0;
         window.clearTimeout(this._timeoutID);
         this._timeoutID = window.setTimeout(
-            () => this._ble.handleDisconnectError(BLEDataStoppedError),
+            this._handleDataTimeout,
+            BLETimeout
+        );
+    }
+
+    /**
+     * Sensor notifications can pause briefly while the micro:bit is busy with
+     * display/BLE operations. Avoid dropping a healthy Link connection on the
+     * first missed packet window; real BLE disconnects are still reported by
+     * the Link through peripheralUnplug/socket close.
+     * @private
+     */
+    _handleDataTimeout () {
+        if (!this._ble || !this._ble.isConnected()) return;
+
+        this._missedDataTimeouts++;
+        if (this._missedDataTimeouts >= BLEDataTimeoutLimit) {
+            this._ble.handleDisconnectError(BLEDataStoppedError);
+            return;
+        }
+
+        this._timeoutID = window.setTimeout(
+            this._handleDataTimeout,
             BLETimeout
         );
     }
