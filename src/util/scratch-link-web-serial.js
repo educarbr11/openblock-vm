@@ -500,7 +500,9 @@ class ScratchLinkWebSerial {
         }
 
         const isNano = fqbn.indexOf('nano') !== -1;
-        const uploadBaudRates = isNano ? [57600, 115200] : [115200];
+        const isOldNanoBootloader = fqbn.indexOf('atmega328old') !== -1;
+        const uploadBaudRates = isNano && isOldNanoBootloader ? [57600, 115200] :
+            (isNano ? [115200, 57600] : [115200]);
         const pages = this._hexToPages(hex, 128);
         const port = this._port;
         const portId = this._portId;
@@ -580,11 +582,11 @@ class ScratchLinkWebSerial {
         }
         return port.setSignals({dataTerminalReady: true, requestToSend: true})
             .catch(() => null)
-            .then(() => this._sleep(60))
+            .then(() => this._sleep(80))
             .then(() => port.setSignals({dataTerminalReady: false, requestToSend: false}).catch(() => null))
-            .then(() => this._sleep(120))
+            .then(() => this._sleep(250))
             .then(() => port.setSignals({dataTerminalReady: true, requestToSend: true}).catch(() => null))
-            .then(() => this._sleep(650));
+            .then(() => this._sleep(450));
     }
 
     _createStk500Session (port) {
@@ -622,18 +624,28 @@ class ScratchLinkWebSerial {
             }
             return writer.write(new Uint8Array(bytes));
         };
-        const expectOk = () => readByte()
+        const readInsync = (attempts = 24) => readByte(250)
             .then(insync => {
-                if (insync !== 0x14) {
+                if (insync === 0x14) {
+                    return insync;
+                }
+                if (attempts <= 0) {
                     throw new Error(`Unexpected bootloader response: 0x${insync.toString(16)}`);
+                }
+                return readInsync(attempts - 1);
+            });
+        const expectOk = () => readInsync()
+            .then(ok => {
+                if (ok !== 0x14) {
+                    throw new Error(`Unexpected bootloader response: 0x${ok.toString(16)}`);
                 }
                 return readByte();
             })
             .then(ok => {
-                if (ok !== 0x10) {
-                    throw new Error(`Bootloader command failed: 0x${ok.toString(16)}`);
+                if (ok === 0x10) {
+                    return null;
                 }
-                return null;
+                throw new Error(`Bootloader command failed: 0x${ok.toString(16)}`);
             });
         return {
             write,
