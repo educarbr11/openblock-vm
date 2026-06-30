@@ -14,12 +14,20 @@ const ArduinoPeripheral = require('../common/arduino-peripheral');
  * @readonly
  */
 const PNPID_LIST = [
+    // Nano clones use many USB-serial chips. Some drivers do not report a
+    // stable VID/PID, so show all serial ports and let the user pick the Nano.
+    '*',
     // For chinese clones that use CH340
     'USB\\VID_1A86&PID_7523',
+    // CH343 / newer WCH USB-serial adapters
+    'USB\\VID_1A86&PID_55D3',
     // CH9102 / newer WCH USB-serial adapters
     'USB\\VID_1A86&PID_55D4',
+    // PL2303 USB-serial adapters
+    'USB\\VID_067B&PID_2303',
     // FTDI USB-serial adapters used by many classic Nano boards
     'USB\\VID_0403&PID_6001',
+    'USB\\VID_0403&PID_6010',
     'USB\\VID_0403&PID_6015',
     // CP210x USB-serial adapters used by some Nano-compatible boards
     'USB\\VID_10C4&PID_EA60',
