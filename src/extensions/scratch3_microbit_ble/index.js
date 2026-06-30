@@ -22,7 +22,9 @@ const blockIconURI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYA
 const BLECommand = {
     CMD_PIN_CONFIG: 0x80,
     CMD_DISPLAY_TEXT: 0x81,
-    CMD_DISPLAY_LED: 0x82
+    CMD_DISPLAY_LED: 0x82,
+    CMD_PIN_PWM: 0x83,
+    CMD_EXTENDED_TELEMETRY: 0x84
 };
 
 
@@ -60,6 +62,12 @@ const BLEUUID = {
     service: 0xf005,
     rxChar: '5261da01-fa7e-42ab-850b-7c80220097cc',
     txChar: '5261da02-fa7e-42ab-850b-7c80220097cc'
+};
+
+const ExtendedTelemetryPacket = {
+    MARKER: 0xd0,
+    VERSION: 1,
+    LENGTH: 20
 };
 
 /**
@@ -106,7 +114,14 @@ class MicroBit {
             buttonB: 0,
             touchPins: [0, 0, 0],
             gestureState: 0,
-            ledMatrixState: new Uint8Array(5)
+            ledMatrixState: new Uint8Array(5),
+            analogPins: [0, 0, 0],
+            accelerationX: 0,
+            accelerationY: 0,
+            accelerationZ: 0,
+            temperature: 0,
+            lightLevel: 0,
+            runningTime: 0
         };
 
         /**
@@ -197,6 +212,30 @@ class MicroBit {
     }
 
     /**
+     * Set a PWM value on P0/P1/P2 using Dogoblock BLE firmware.
+     * @param {number} pin - the pin number to set.
+     * @param {number} value - the PWM value, 0..1023.
+     * @return {Promise} - a Promise that resolves when writing to peripheral.
+     */
+    setPwmValue (pin, value) {
+        value = Math.max(0, Math.min(1023, Math.round(value)));
+        return this.send(BLECommand.CMD_PIN_PWM, new Uint8Array([pin, (value >> 8) & 0xff, value & 0xff]));
+    }
+
+    /**
+     * Enable extended Dogoblock telemetry packets. Official Scratch firmware
+     * ignores this unknown command, keeping the extension backward compatible.
+     * @return {Promise} - a Promise that resolves when writing to peripheral.
+     */
+    enableExtendedTelemetry () {
+        if (!this._ble) return Promise.resolve();
+
+        const output = new Uint8Array([BLECommand.CMD_EXTENDED_TELEMETRY, 1]);
+        const data = Base64Util.uint8ArrayToBase64(output);
+        return this._ble.write(BLEUUID.service, BLEUUID.txChar, data, 'base64', true);
+    }
+
+    /**
      * Clear the Scratch firmware pin/touch configuration. This is a compatibility
      * fallback for boards still running the official Scratch BLE firmware, where
      * CMD_PIN_CONFIG is not a real digital write and may leave a pin pulled high.
@@ -247,6 +286,30 @@ class MicroBit {
      */
     get ledMatrixState () {
         return this._sensors.ledMatrixState;
+    }
+
+    get temperature () {
+        return this._sensors.temperature;
+    }
+
+    get lightLevel () {
+        return this._sensors.lightLevel;
+    }
+
+    get runningTime () {
+        return this._sensors.runningTime;
+    }
+
+    get accelerationX () {
+        return this._sensors.accelerationX;
+    }
+
+    get accelerationY () {
+        return this._sensors.accelerationY;
+    }
+
+    get accelerationZ () {
+        return this._sensors.accelerationZ;
     }
 
     /**
@@ -372,6 +435,10 @@ class MicroBit {
                     this._handleDataTimeout,
                     BLETimeout
                 );
+                return this.enableExtendedTelemetry()
+                    .catch(() => {
+                        // Official Scratch firmware does not implement this command.
+                    });
             })
             .catch(error => {
                 const message = error && error.message ? error.message : String(error);
@@ -394,6 +461,13 @@ class MicroBit {
             return;
         }
 
+        if (data.length >= ExtendedTelemetryPacket.LENGTH &&
+            data[0] === ExtendedTelemetryPacket.MARKER &&
+            data[1] === ExtendedTelemetryPacket.VERSION) {
+            this._parseExtendedTelemetry(data);
+            return;
+        }
+
         this._sensors.tiltX = data[1] | (data[0] << 8);
         if (this._sensors.tiltX > (1 << 15)) this._sensors.tiltX -= (1 << 16);
         this._sensors.tiltY = data[3] | (data[2] << 8);
@@ -409,6 +483,46 @@ class MicroBit {
         this._sensors.gestureState = data[9];
 
         // cancel disconnect timeout and start a new one
+        this._missedDataTimeouts = 0;
+        window.clearTimeout(this._timeoutID);
+        this._timeoutID = window.setTimeout(
+            this._handleDataTimeout,
+            BLETimeout
+        );
+    }
+
+    _parseInt16 (data, offset) {
+        let value = data[offset + 1] | (data[offset] << 8);
+        if (value >= (1 << 15)) value -= (1 << 16);
+        return value;
+    }
+
+    _parseUInt16 (data, offset) {
+        return data[offset + 1] | (data[offset] << 8);
+    }
+
+    _parseUInt32 (data, offset) {
+        return ((data[offset] * 0x1000000) +
+            (data[offset + 1] << 16) +
+            (data[offset + 2] << 8) +
+            data[offset + 3]) >>> 0;
+    }
+
+    _parseInt8 (value) {
+        return value > 127 ? value - 256 : value;
+    }
+
+    _parseExtendedTelemetry (data) {
+        this._sensors.analogPins[0] = this._parseUInt16(data, 2);
+        this._sensors.analogPins[1] = this._parseUInt16(data, 4);
+        this._sensors.analogPins[2] = this._parseUInt16(data, 6);
+        this._sensors.accelerationX = this._parseInt16(data, 8);
+        this._sensors.accelerationY = this._parseInt16(data, 10);
+        this._sensors.accelerationZ = this._parseInt16(data, 12);
+        this._sensors.temperature = this._parseInt8(data[14]);
+        this._sensors.lightLevel = data[15];
+        this._sensors.runningTime = this._parseUInt32(data, 16);
+
         this._missedDataTimeouts = 0;
         window.clearTimeout(this._timeoutID);
         this._timeoutID = window.setTimeout(
@@ -446,6 +560,10 @@ class MicroBit {
      */
     _checkPinState (pin) {
         return this._sensors.touchPins[pin];
+    }
+
+    _readAnalogPin (pin) {
+        return this._sensors.analogPins[pin] || 0;
     }
 }
 
@@ -492,6 +610,17 @@ const MicroBitButtons = {
 const MicroBitPinState = {
     ON: 'on',
     OFF: 'off'
+};
+
+/**
+ * Enum for micro:bit accelerometer axis.
+ * @readonly
+ * @enum {string}
+ */
+const MicroBitAxis = {
+    X: 'x',
+    Y: 'y',
+    Z: 'z'
 };
 
 /**
@@ -619,6 +748,26 @@ class Scratch3MicroBitBlocks {
             {
                 text: '1',
                 value: '1'
+            }
+        ];
+    }
+
+    /**
+     * @return {array} - text and values for each accelerometer axis.
+     */
+    get AXIS_MENU () {
+        return [
+            {
+                text: 'X',
+                value: MicroBitAxis.X
+            },
+            {
+                text: 'Y',
+                value: MicroBitAxis.Y
+            },
+            {
+                text: 'Z',
+                value: MicroBitAxis.Z
             }
         ];
     }
@@ -932,6 +1081,86 @@ class Scratch3MicroBitBlocks {
                             defaultValue: '1'
                         }
                     }
+                },
+                {
+                    opcode: 'setPwmValue',
+                    text: formatMessage({
+                        id: 'microbit.setPwmValue',
+                        default: 'set pin [PIN] PWM to [VALUE]',
+                        description: 'set the selected micro:bit pin PWM value from 0 to 1023'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        PIN: {
+                            type: ArgumentType.STRING,
+                            menu: 'touchPins',
+                            defaultValue: '0'
+                        },
+                        VALUE: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 1023
+                        }
+                    }
+                },
+                {
+                    opcode: 'getAnalogPinValue',
+                    text: formatMessage({
+                        id: 'microbit.analogPinValue',
+                        default: 'analog pin [PIN] value',
+                        description: 'the latest analog value for the selected micro:bit pin'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    arguments: {
+                        PIN: {
+                            type: ArgumentType.STRING,
+                            menu: 'touchPins',
+                            defaultValue: '0'
+                        }
+                    }
+                },
+                '---',
+                {
+                    opcode: 'getAcceleration',
+                    text: formatMessage({
+                        id: 'microbit.acceleration',
+                        default: '[AXIS] acceleration',
+                        description: 'the latest acceleration value for the selected micro:bit axis'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    arguments: {
+                        AXIS: {
+                            type: ArgumentType.STRING,
+                            menu: 'axis',
+                            defaultValue: MicroBitAxis.X
+                        }
+                    }
+                },
+                {
+                    opcode: 'getTemperature',
+                    text: formatMessage({
+                        id: 'microbit.temperature',
+                        default: 'temperature',
+                        description: 'the latest micro:bit temperature'
+                    }),
+                    blockType: BlockType.REPORTER
+                },
+                {
+                    opcode: 'getLightLevel',
+                    text: formatMessage({
+                        id: 'microbit.lightLevel',
+                        default: 'light level',
+                        description: 'the latest micro:bit light level'
+                    }),
+                    blockType: BlockType.REPORTER
+                },
+                {
+                    opcode: 'getRunningTime',
+                    text: formatMessage({
+                        id: 'microbit.runningTime',
+                        default: 'running time',
+                        description: 'the latest micro:bit running time in milliseconds'
+                    }),
+                    blockType: BlockType.REPORTER
                 }
             ],
             menus: {
@@ -962,6 +1191,10 @@ class Scratch3MicroBitBlocks {
                 pinValues: {
                     acceptReporters: true,
                     items: this.PIN_VALUE_MENU
+                },
+                axis: {
+                    acceptReporters: true,
+                    items: this.AXIS_MENU
                 }
             }
         }];
@@ -1209,6 +1442,77 @@ class Scratch3MicroBitBlocks {
                     resolve();
                 }, BLESendInterval);
             }));
+    }
+
+    /**
+     * Set the selected micro:bit pin to PWM value 0..1023.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after a tick.
+     */
+    setPwmValue (args) {
+        const pin = parseInt(args.PIN, 10);
+        if (isNaN(pin) || pin < 0 || pin > 2) return;
+
+        const value = Math.max(0, Math.min(1023, cast.toNumber(args.VALUE)));
+        return Promise.resolve(this._peripheral.setPwmValue(pin, value))
+            .then(() => new Promise(resolve => {
+                setTimeout(() => {
+                    resolve();
+                }, BLESendInterval);
+            }));
+    }
+
+    /**
+     * Get latest analog value for P0/P1/P2.
+     * @param {object} args - the block's arguments.
+     * @return {number} - analog value from 0 to 1023.
+     */
+    getAnalogPinValue (args) {
+        const pin = parseInt(args.PIN, 10);
+        if (isNaN(pin) || pin < 0 || pin > 2) return 0;
+        return this._peripheral._readAnalogPin(pin);
+    }
+
+    /**
+     * Get latest acceleration value for selected axis.
+     * @param {object} args - the block's arguments.
+     * @return {number} - acceleration in milli-g units as reported by micro:bit.
+     */
+    getAcceleration (args) {
+        switch (cast.toString(args.AXIS)) {
+        case MicroBitAxis.X:
+            return this._peripheral.accelerationX;
+        case MicroBitAxis.Y:
+            return this._peripheral.accelerationY;
+        case MicroBitAxis.Z:
+            return this._peripheral.accelerationZ;
+        default:
+            return 0;
+        }
+    }
+
+    /**
+     * Get latest temperature.
+     * @return {number} - temperature in celsius.
+     */
+    getTemperature () {
+        return this._peripheral.temperature;
+    }
+
+    /**
+     * Get latest display light level.
+     * @return {number} - light level from 0 to 255.
+     */
+    getLightLevel () {
+        return this._peripheral.lightLevel;
+    }
+
+    /**
+     * Get latest running time.
+     * @return {number} - running time in milliseconds.
+     */
+    getRunningTime () {
+        return this._peripheral.runningTime;
     }
 }
 
