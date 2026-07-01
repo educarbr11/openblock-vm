@@ -22,16 +22,24 @@ class ScratchLinkWebSocket {
         this._ws = null;
     }
 
+    _getServerUrl (path) {
+        const envPort = typeof process !== 'undefined' && process.env ?
+            process.env.OPENBLOCK_LINK_PORT :
+            null;
+        const port = envPort || '20111';
+        return `ws://127.0.0.1:${port}${path}`;
+    }
+
     open () {
         switch (this._type) {
         case 'BLE':
-            this._ws = new WebSocket('ws://127.0.0.1:20111/openblock/ble');
+            this._ws = new WebSocket(this._getServerUrl('/openblock/ble'));
             break;
         case 'BT':
-            this._ws = new WebSocket('ws://127.0.0.1:20111/openblock/bt');
+            this._ws = new WebSocket(this._getServerUrl('/openblock/bt'));
             break;
         case 'SERIALPORT':
-            this._ws = new WebSocket('ws://127.0.0.1:20111/openblock/serialport');
+            this._ws = new WebSocket(this._getServerUrl('/openblock/serialport'));
             break;
         default:
             throw new Error(`Unknown OpenblockLink socket Type: ${this._type}`);
