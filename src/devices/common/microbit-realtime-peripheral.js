@@ -5,7 +5,7 @@ const Serialport = require('../../io/serialport');
 const MICROBIT_REALTIME_TIMEOUT = 2000;
 const MICROBIT_REALTIME_CONNECT_TIMEOUT = 9000;
 const MICROBIT_REALTIME_RETRY_INTERVAL = 300;
-const MICROBIT_REALTIME_POLL_INTERVAL = 100;
+const MICROBIT_REALTIME_POLL_INTERVAL = 200;
 const MICROBIT_REALTIME_VERSION = 'microbit-realtime-v2';
 
 const ConnectMicrobitTimeout =
@@ -114,6 +114,30 @@ class MicrobitRealtimePeripheral{
     uploadFirmware () {
         this._stopRealtime();
         this._serialport.uploadFirmware(this.diveceOpt);
+    }
+
+    /**
+     * Called by the runtime when user wants to upload a compiled micro:bit HEX artifact.
+     * This path only needs the Link socket because the Link copies the HEX to the MICROBIT drive.
+     * @param {string} artifact - the HEX artifact.
+     * @param {?string} encoding - the artifact encoding.
+     * @param {?object} options - upload options.
+     * @return {*} upload request result.
+     */
+    uploadArtifact (artifact, encoding = null, options = null) {
+        this._stopRealtime();
+        if (!this._serialport) {
+            this._serialport = new Serialport(this._runtime, this._originalDeviceId, {
+                filters: {
+                    pnpid: this.pnpidList
+                },
+                skipInitialDiscover: true
+            }, this._onConnect, this.reset);
+        }
+        const artifactText = encoding ? Buffer.from(artifact, encoding).toString() : artifact;
+        const base64Str = Buffer.from(artifactText).toString('base64');
+        const uploadOptions = Object.assign({artifactType: 'microbitHex'}, options || {});
+        return this._serialport.upload(base64Str, this.diveceOpt, 'base64', uploadOptions);
     }
 
     /**
@@ -342,6 +366,31 @@ class MicrobitRealtimePeripheral{
     }
 
     /**
+     * Scroll text on the micro:bit display.
+     * @param {string} text - text to scroll.
+     * @param {boolean} wait - whether firmware should wait until scroll completes.
+     * @return {Promise} - a Promise that resolves when the command is accepted.
+     */
+    showText (text, wait = false) {
+        const hexText = Buffer.from(String(text || ''), 'utf8').toString('hex');
+        return this._request(`${wait ? 'TEXTWAIT' : 'TEXT'} ${hexText}`, false, response => response === '1');
+    }
+
+    /**
+     * Set a display pixel brightness.
+     * @param {number} x - x coordinate.
+     * @param {number} y - y coordinate.
+     * @param {number} brightness - brightness 0..9.
+     * @return {Promise} - a Promise that resolves when the command is accepted.
+     */
+    setPixel (x, y, brightness) {
+        x = this._clampNumber(x, 0, 4);
+        y = this._clampNumber(y, 0, 4);
+        brightness = this._clampNumber(brightness, 0, 9);
+        return this._request(`PIXEL ${x} ${y} ${brightness}`, false, response => response === '1');
+    }
+
+    /**
      * Clear the micro:bit display.
      * @return {Promise} - a Promise that resolves when the display is cleared.
      */
@@ -493,7 +542,11 @@ class MicrobitRealtimePeripheral{
             'microbit_whenMicrobitBegin',
             'microbit_whenButtonPressed',
             'microbit_whenPinTouched',
-            'microbit_whenGesture'
+            'microbit_whenGesture',
+            'microbit_microbit_whenMicrobitBegin',
+            'microbit_microbit_whenButtonPressed',
+            'microbit_microbit_whenPinTouched',
+            'microbit_microbit_whenGesture'
         ].forEach(opcode => {
             this._runtime._hats[opcode] = {
                 edgeActivated: false,
@@ -569,23 +622,27 @@ class MicrobitRealtimePeripheral{
             gesture: this._normalizeGesture(parts[6])
         };
 
-        this._triggerOnRising('event_whenmicrobitbuttonpressed', 'KEY_OPTION', 'a', state.a);
-        this._triggerOnRising('event_whenmicrobitbuttonpressed', 'KEY_OPTION', 'b', state.b);
+        this._triggerMicrobitButtonHats('a', state.a);
+        this._triggerMicrobitButtonHats('b', state.b);
         this._triggerOnRising('event_whenmicrobitbuttonpressed', 'KEY_OPTION', 'ab', state.ab);
         this._triggerOnRising('event_whenmicrobitpinbeingtouched', 'PIN_OPTION', '0', state.t0);
         this._triggerOnRising('event_whenmicrobitpinbeingtouched', 'PIN_OPTION', '1', state.t1);
         this._triggerOnRising('event_whenmicrobitpinbeingtouched', 'PIN_OPTION', '2', state.t2);
-        this._triggerOnRising('microbit_whenButtonPressed', 'KEY', 'a', state.a);
-        this._triggerOnRising('microbit_whenButtonPressed', 'KEY', 'b', state.b);
         this._triggerOnRising('microbit_whenPinTouched', 'PIN', '0', state.t0);
         this._triggerOnRising('microbit_whenPinTouched', 'PIN', '1', state.t1);
         this._triggerOnRising('microbit_whenPinTouched', 'PIN', '2', state.t2);
+        this._triggerOnRising('microbit_microbit_whenPinTouched', 'PIN', '0', state.t0);
+        this._triggerOnRising('microbit_microbit_whenPinTouched', 'PIN', '1', state.t1);
+        this._triggerOnRising('microbit_microbit_whenPinTouched', 'PIN', '2', state.t2);
 
         if (state.gesture && state.gesture !== this._lastEventState.gesture) {
             this._runtime.startHats('event_whenmicrobitgesture', {
                 GESTURE_OPTION: state.gesture
             });
             this._runtime.startHats('microbit_whenGesture', {
+                STA: state.gesture
+            });
+            this._runtime.startHats('microbit_microbit_whenGesture', {
                 STA: state.gesture
             });
         }
@@ -609,6 +666,34 @@ class MicrobitRealtimePeripheral{
             fields[field] = value;
             this._runtime.startHats(opcode, fields);
         }
+    }
+
+    /**
+     * Trigger button hats in every micro:bit block format currently supported.
+     * The native device uses KEY=a/b, old projects/extensions use BTN=A/B, and
+     * legacy OpenBlock event blocks use KEY_OPTION=a/b.
+     * @param {string} key - lowercase button key.
+     * @param {boolean} current - current pressed state.
+     * @private
+     */
+    _triggerMicrobitButtonHats (key, current) {
+        const previous = this._lastEventState[key] || false;
+        if (!current || previous) {
+            return;
+        }
+        const upperKey = key.toUpperCase();
+        this._runtime.startHats('event_whenmicrobitbuttonpressed', {
+            KEY_OPTION: key
+        });
+        this._runtime.startHats('microbit_whenButtonPressed', {
+            KEY: key
+        });
+        this._runtime.startHats('microbit_whenButtonPressed', {
+            BTN: upperKey
+        });
+        this._runtime.startHats('microbit_microbit_whenButtonPressed', {
+            KEY: key
+        });
     }
 
     /**
@@ -674,6 +759,7 @@ class MicrobitRealtimePeripheral{
                 this._serialport.handleRealtimeConnectSucess();
                 this._runtime.startHats('event_whenmicrobitbegin');
                 this._runtime.startHats('microbit_whenMicrobitBegin');
+                this._runtime.startHats('microbit_microbit_whenMicrobitBegin');
                 this._startEventPolling();
             });
     }

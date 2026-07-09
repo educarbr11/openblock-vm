@@ -2240,7 +2240,17 @@ class Runtime extends EventEmitter {
             // (i.e., before the predicate can be run) because "broadcast and wait"
             // needs to have a precise collection of started threads.
             for (const matchField in optMatchFields) {
-                if (hatFields[matchField].value !== optMatchFields[matchField]) {
+                const hatField = hatFields[matchField];
+                if (!hatField) {
+                    return;
+                }
+                const hatFieldValue = hatField.value;
+                const matchFieldValue = optMatchFields[matchField];
+                const isMicrobitHat = requestedHatOpcode.indexOf('microbit') > -1;
+                const matches = isMicrobitHat ?
+                    String(hatFieldValue).toUpperCase() === String(matchFieldValue).toUpperCase() :
+                    hatFieldValue === matchFieldValue;
+                if (!matches) {
                     // Field mismatch.
                     return;
                 }

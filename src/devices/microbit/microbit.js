@@ -1136,8 +1136,7 @@ class OpenBlockMicrobitDevice {
      * @return {Promise} - a Promise that resolves after the set pin digital out level is done.
      */
     setDigitalOutput (args) {
-        this._peripheral.setDigitalOutput(args.PIN, args.LEVEL);
-        return Promise.resolve();
+        return this._peripheral.setDigitalOutput(args.PIN, args.LEVEL);
     }
 
     /**
@@ -1146,8 +1145,7 @@ class OpenBlockMicrobitDevice {
      * @return {Promise} - a Promise that resolves after the set pin pwm out value is done.
      */
     setPwmOutput (args) {
-        this._peripheral.setPwmOutput(args.PIN, args.OUT);
-        return Promise.resolve();
+        return this._peripheral.setPwmOutput(args.PIN, args.OUT);
     }
 
     /**
@@ -1234,8 +1232,58 @@ class OpenBlockMicrobitDevice {
      * @return {Promise} - a Promise that resolves after the image is sent.
      */
     showImage (args) {
-        this._peripheral.showImage(args.VALUE);
-        return Promise.resolve();
+        return this._peripheral.showImage(args.VALUE);
+    }
+
+    /**
+     * Show image on the micro:bit display for a duration.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the duration.
+     */
+    showImageUntil (args) {
+        const milliseconds = Math.max(0, Number(args.TIME) || 0) * 1000;
+        return this._peripheral.showImage(args.VALUE).then(() => new Promise(resolve => {
+            setTimeout(resolve, milliseconds);
+        })).then(() => {
+            return this._peripheral.clearDisplay();
+        });
+    }
+
+    /**
+     * Scroll text on the micro:bit display.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the command is sent.
+     */
+    show (args) {
+        return this._peripheral.showText(args.TEXT, false);
+    }
+
+    /**
+     * Scroll text and wait for completion on the micro:bit display.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the command is accepted.
+     */
+    showUntilScrollDone (args) {
+        return this._peripheral.showText(args.TEXT, true);
+    }
+
+    /**
+     * Turn a display pixel on or off.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the command is sent.
+     */
+    lightPixelAt (args) {
+        const brightness = args.STATE === LedState.On ? 9 : 0;
+        return this._peripheral.setPixel(args.X, args.Y, brightness);
+    }
+
+    /**
+     * Set display pixel brightness.
+     * @param {object} args - the block's arguments.
+     * @return {Promise} - a Promise that resolves after the command is sent.
+     */
+    showOnPiexlbrightness (args) {
+        return this._peripheral.setPixel(args.X, args.Y, args.BRT);
     }
 
     /**
@@ -1243,8 +1291,7 @@ class OpenBlockMicrobitDevice {
      * @return {Promise} - a Promise that resolves after the display is cleared.
      */
     clearDisplay () {
-        this._peripheral.clearDisplay();
-        return Promise.resolve();
+        return this._peripheral.clearDisplay();
     }
 }
 

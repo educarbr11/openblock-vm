@@ -60,6 +60,8 @@ test('poll events trigger microbit button hat', t => {
 
     t.ok(calls.some(call => call.opcode === 'microbit_whenButtonPressed' &&
         call.fields.KEY === 'a'));
+    t.ok(calls.some(call => call.opcode === 'microbit_microbit_whenButtonPressed' &&
+        call.fields.KEY === 'a'));
     t.end();
 });
 
