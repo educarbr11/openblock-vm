@@ -2,6 +2,7 @@ const formatMessage = require('format-message');
 
 const ArgumentType = require('../../extension-support/argument-type');
 const BlockType = require('../../extension-support/block-type');
+const ProgramModeType = require('../../extension-support/program-mode-type');
 
 const MicrobitRealtimePeripheral = require('../common/microbit-realtime-peripheral');
 
@@ -117,7 +118,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.ledState.on',
-                    default: 'on',
+                    default: 'ligado',
                     description: 'label for led state on'
                 }),
                 value: LedState.On
@@ -125,7 +126,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.ledState.off',
-                    default: 'off',
+                    default: 'desligado',
                     description: 'label for led state off'
                 }),
                 value: LedState.Off
@@ -196,7 +197,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.shaken',
-                    default: 'shaken',
+                    default: 'sacudido',
                     description: 'label for shaken gestrue'
                 }),
                 value: Gestrue.Shake
@@ -204,7 +205,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.tiltedUpward',
-                    default: 'tilted upward',
+                    default: 'inclinado para cima',
                     description: 'label for tilted upward gestrue'
                 }),
                 value: Gestrue.Up
@@ -212,7 +213,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.tiltedDownward',
-                    default: 'tilted downward',
+                    default: 'inclinado para baixo',
                     description: 'label for tilted downward gestrue'
                 }),
                 value: Gestrue.Down
@@ -220,7 +221,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.tiltedLeftward',
-                    default: 'tilted leftward',
+                    default: 'inclinado para a esquerda',
                     description: 'label for tilted leftward gestrue'
                 }),
                 value: Gestrue.Left
@@ -228,7 +229,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.tiltedRightward',
-                    default: 'tilted rightward',
+                    default: 'inclinado para a direita',
                     description: 'label for tilted rightward gestrue'
                 }),
                 value: Gestrue.Right
@@ -236,7 +237,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.faceUp',
-                    default: 'face up',
+                    default: 'virado para cima',
                     description: 'label for face up gestrue'
                 }),
                 value: Gestrue.Faceup
@@ -244,7 +245,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.faceDown',
-                    default: 'face down',
+                    default: 'virado para baixo',
                     description: 'label for face down gestrue'
                 }),
                 value: Gestrue.Facedown
@@ -252,7 +253,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.gestruesMenu.freefall',
-                    default: 'freefall',
+                    default: 'queda livre',
                     description: 'label for freefall gestrue'
                 }),
                 value: Gestrue.Freefall
@@ -277,7 +278,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.axisMenu.xAxis',
-                    default: 'x-axis',
+                    default: 'eixo X',
                     description: 'label for x axis'
                 }),
                 value: Axis.X
@@ -285,7 +286,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.axisMenu.yAxis',
-                    default: 'y-axis',
+                    default: 'eixo Y',
                     description: 'label for y axis'
                 }),
                 value: Axis.Y
@@ -293,7 +294,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.axisMenu.zAxis',
-                    default: 'z-axis',
+                    default: 'eixo Z',
                     description: 'label for z axis'
                 }),
                 value: Axis.Z
@@ -380,7 +381,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.levelMenu.high',
-                    default: 'high',
+                    default: 'ligado',
                     description: 'label for high level'
                 }),
                 value: Level.High
@@ -388,7 +389,7 @@ class OpenBlockMicrobitDevice {
             {
                 text: formatMessage({
                     id: 'microbit.levelMenu.low',
-                    default: 'low',
+                    default: 'desligado',
                     description: 'label for low level'
                 }),
                 value: Level.Low
@@ -1023,7 +1024,8 @@ class OpenBlockMicrobitDevice {
                 }),
                 blockType: BlockType.EVENT,
                 isEdgeActivated: false,
-                shouldRestartExistingThreads: false
+                shouldRestartExistingThreads: false,
+                programMode: [ProgramModeType.UPLOAD]
             },
             {
                 opcode: 'whenButtonPressed',
@@ -1119,7 +1121,7 @@ class OpenBlockMicrobitDevice {
             id: 'microbit',
             name: formatMessage({
                 id: 'microbit.category.microbit',
-                default: 'micro:bit',
+                default: 'micro:bit v2',
                 description: 'The name of the microbit device category'
             }),
             color1: '#4CBFE6',
