@@ -5,6 +5,7 @@ const BlockType = require('../../extension-support/block-type');
 const ProgramModeType = require('../../extension-support/program-mode-type');
 
 const ArduinoPeripheral = require('../common/arduino-peripheral');
+const {ARDUINO_THEME, applyDeviceTheme} = require('../common/device-visual-theme');
 
 /**
  * The list of USB device filters.
@@ -624,7 +625,7 @@ class OpenBlockArduinoUnoR4WifiDevice {
      * @returns {Array.<object>} metadata for this extension and its blocks.
      */
     getInfo () {
-        return [
+        return applyDeviceTheme([
             {
                 id: 'pin',
                 name: formatMessage({
@@ -1219,7 +1220,7 @@ class OpenBlockArduinoUnoR4WifiDevice {
                     }
                 }
             }
-        ];
+        ], ARDUINO_THEME);
     }
 
     /**

@@ -5,6 +5,7 @@ const BlockType = require('../../extension-support/block-type');
 const ProgramModeType = require('../../extension-support/program-mode-type');
 
 const MicrobitRealtimePeripheral = require('../common/microbit-realtime-peripheral');
+const {MICROBIT_THEME, applyDeviceTheme} = require('../common/device-visual-theme');
 
 /**
 * The list of USB device filters.
@@ -1252,7 +1253,7 @@ class OpenBlockMicrobitDevice {
         menus.soundEvents = {items: this.SOUND_EVENTS_MENU};
         menus.logoEvents = {items: this.LOGO_EVENTS_MENU};
 
-        return [{
+        return applyDeviceTheme([{
             id: 'microbit',
             name: formatMessage({
                 id: 'microbit.category.microbit',
@@ -1264,7 +1265,7 @@ class OpenBlockMicrobitDevice {
             color3: '#2E8EB8',
             blocks: blocks,
             menus: menus
-        }];
+        }], MICROBIT_THEME);
     }
 
     /**
