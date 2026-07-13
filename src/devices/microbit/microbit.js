@@ -87,6 +87,16 @@ const Level = {
     Low: '0'
 };
 
+const SoundEvent = {
+    Loud: 'loud',
+    Quiet: 'quiet'
+};
+
+const LogoEvent = {
+    Pressed: 'pressed',
+    Released: 'released'
+};
+
 /**
  * Manage communication with a Microbit peripheral over a OpenBlock Link client socket.
  */
@@ -188,6 +198,48 @@ class OpenBlockMicrobitDevice {
             {
                 text: 'B',
                 value: Key.B
+            }
+        ];
+    }
+
+    get SOUND_EVENTS_MENU () {
+        return [
+            {
+                text: formatMessage({
+                    id: 'microbit.soundEvent.loud',
+                    default: 'forte',
+                    description: 'label for loud sound event'
+                }),
+                value: SoundEvent.Loud
+            },
+            {
+                text: formatMessage({
+                    id: 'microbit.soundEvent.quiet',
+                    default: 'baixo',
+                    description: 'label for quiet sound event'
+                }),
+                value: SoundEvent.Quiet
+            }
+        ];
+    }
+
+    get LOGO_EVENTS_MENU () {
+        return [
+            {
+                text: formatMessage({
+                    id: 'microbit.logoEvent.pressed',
+                    default: 'pressionado',
+                    description: 'label for logo pressed event'
+                }),
+                value: LogoEvent.Pressed
+            },
+            {
+                text: formatMessage({
+                    id: 'microbit.logoEvent.released',
+                    default: 'liberado',
+                    description: 'label for logo released event'
+                }),
+                value: LogoEvent.Released
             }
         ];
     }
@@ -769,6 +821,45 @@ class OpenBlockMicrobitDevice {
                         }
                     }
                 },
+                {
+                    opcode: 'logoIsPressed',
+                    text: formatMessage({
+                        id: 'microbit.sensor.logoIsPressed',
+                        default: 'logotipo pressionado?',
+                        description: 'whether microbit logo is pressed'
+                    }),
+                    blockType: BlockType.BOOLEAN
+                },
+                {
+                    opcode: 'soundLevel',
+                    text: formatMessage({
+                        id: 'microbit.sensor.soundLevel',
+                        default: 'nível do som',
+                        description: 'microbit microphone sound level'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    disableMonitor: true
+                },
+                {
+                    opcode: 'setSoundThreshold',
+                    text: formatMessage({
+                        id: 'microbit.sensor.setSoundThreshold',
+                        default: 'definir som [EVENT] no limite [VALUE]',
+                        description: 'set microbit sound event threshold'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        EVENT: {
+                            type: ArgumentType.STRING,
+                            menu: 'soundEvents',
+                            defaultValue: SoundEvent.Loud
+                        },
+                        VALUE: {
+                            type: ArgumentType.UINT8_NUMBER,
+                            defaultValue: '128'
+                        }
+                    }
+                },
                 '---',
                 {
                     opcode: 'gestureIsX',
@@ -875,6 +966,9 @@ class OpenBlockMicrobitDevice {
                 },
                 axis: {
                     items: this.AXIS_MENU
+                },
+                soundEvents: {
+                    items: this.SOUND_EVENTS_MENU
                 }
             }
         },
@@ -1007,6 +1101,9 @@ class OpenBlockMicrobitDevice {
             'showImage',
             'clearDisplay',
             'buttonIsPressed',
+            'logoIsPressed',
+            'soundLevel',
+            'setSoundThreshold',
             'gestureIsX',
             'axisAcceleration',
             'lightLevel',
@@ -1042,6 +1139,42 @@ class OpenBlockMicrobitDevice {
                         type: ArgumentType.STRING,
                         menu: 'keys',
                         defaultValue: Key.A
+                    }
+                }
+            },
+            {
+                opcode: 'whenSound',
+                text: formatMessage({
+                    id: 'microbit.event.whenSound',
+                    default: 'quando o som estiver [EVENT]',
+                    description: 'microbit sound event'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false,
+                arguments: {
+                    EVENT: {
+                        type: ArgumentType.STRING,
+                        menu: 'soundEvents',
+                        defaultValue: SoundEvent.Loud
+                    }
+                }
+            },
+            {
+                opcode: 'whenLogo',
+                text: formatMessage({
+                    id: 'microbit.event.whenLogo',
+                    default: 'quando o logotipo for [EVENT]',
+                    description: 'microbit logo event'
+                }),
+                blockType: BlockType.EVENT,
+                isEdgeActivated: false,
+                shouldRestartExistingThreads: false,
+                arguments: {
+                    EVENT: {
+                        type: ArgumentType.STRING,
+                        menu: 'logoEvents',
+                        defaultValue: LogoEvent.Pressed
                     }
                 }
             },
@@ -1116,6 +1249,8 @@ class OpenBlockMicrobitDevice {
 
         const menus = {};
         categories.forEach(category => Object.assign(menus, category.menus));
+        menus.soundEvents = {items: this.SOUND_EVENTS_MENU};
+        menus.logoEvents = {items: this.LOGO_EVENTS_MENU};
 
         return [{
             id: 'microbit',
@@ -1148,6 +1283,18 @@ class OpenBlockMicrobitDevice {
      */
     setPwmOutput (args) {
         return this._peripheral.setPwmOutput(args.PIN, args.OUT);
+    }
+
+    logoIsPressed () {
+        return this._peripheral.logoIsPressed();
+    }
+
+    soundLevel () {
+        return this._peripheral.soundLevel();
+    }
+
+    setSoundThreshold (args) {
+        return this._peripheral.setSoundThreshold(args.EVENT, args.VALUE);
     }
 
     /**
@@ -1246,9 +1393,8 @@ class OpenBlockMicrobitDevice {
         const milliseconds = Math.max(0, Number(args.TIME) || 0) * 1000;
         return this._peripheral.showImage(args.VALUE).then(() => new Promise(resolve => {
             setTimeout(resolve, milliseconds);
-        })).then(() => {
-            return this._peripheral.clearDisplay();
-        });
+        }))
+            .then(() => this._peripheral.clearDisplay());
     }
 
     /**

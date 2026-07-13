@@ -65,6 +65,55 @@ test('poll events trigger microbit button hat', t => {
     t.end();
 });
 
+test('micro:bit v2 input reporters send realtime commands', t => {
+    const {peripheral} = makePeripheral();
+    const commands = [];
+    peripheral._request = (command, fallback, parser) => {
+        commands.push(command);
+        const responses = {
+            'LOGO': '1',
+            'SOUND': '173',
+            'SOUNDTHRESH QUIET 64': '1'
+        };
+        return Promise.resolve(parser(responses[command]));
+    };
+
+    Promise.all([
+        peripheral.logoIsPressed(),
+        peripheral.soundLevel(),
+        peripheral.setSoundThreshold('quiet', 64)
+    ]).then(values => {
+        t.same(commands, ['LOGO', 'SOUND', 'SOUNDTHRESH QUIET 64']);
+        t.same(values, [true, 173, true]);
+        t.end();
+    });
+});
+
+test('poll events trigger logo and sound hats', t => {
+    const {peripheral, calls} = makePeripheral();
+
+    peripheral._handlePollEvent('0,0,0,0,0,0,,1,173,loud');
+    peripheral._handlePollEvent('0,0,0,0,0,0,,0,42,quiet');
+
+    t.ok(calls.some(call => call.opcode === 'microbit_whenLogo' &&
+        call.fields.EVENT === 'pressed'));
+    t.ok(calls.some(call => call.opcode === 'microbit_whenLogo' &&
+        call.fields.EVENT === 'released'));
+    t.ok(calls.some(call => call.opcode === 'microbit_microbit_whenLogo' &&
+        call.fields.EVENT === 'pressed'));
+    t.ok(calls.some(call => call.opcode === 'microbit_microbit_whenLogo' &&
+        call.fields.EVENT === 'released'));
+    t.ok(calls.some(call => call.opcode === 'microbit_whenSound' &&
+        call.fields.EVENT === 'loud'));
+    t.ok(calls.some(call => call.opcode === 'microbit_whenSound' &&
+        call.fields.EVENT === 'quiet'));
+    t.ok(calls.some(call => call.opcode === 'microbit_microbit_whenSound' &&
+        call.fields.EVENT === 'loud'));
+    t.ok(calls.some(call => call.opcode === 'microbit_microbit_whenSound' &&
+        call.fields.EVENT === 'quiet'));
+    t.end();
+});
+
 test('poll does not enqueue while serial request is active', t => {
     const {peripheral} = makePeripheral();
     const originalWindow = global.window;

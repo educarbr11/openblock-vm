@@ -86,7 +86,9 @@ class MicrobitRealtimePeripheral{
             t0: false,
             t1: false,
             t2: false,
-            gesture: ''
+            gesture: '',
+            logo: false,
+            soundEvent: ''
         };
 
         this.reset = this.reset.bind(this);
@@ -352,6 +354,23 @@ class MicrobitRealtimePeripheral{
         });
     }
 
+    logoIsPressed () {
+        return this._request('LOGO', false, value => Number(value) === 1);
+    }
+
+    soundLevel () {
+        return this._request('SOUND', '', value => {
+            const number = Number(value);
+            return Number.isNaN(number) ? '' : number;
+        });
+    }
+
+    setSoundThreshold (event, value) {
+        const normalizedEvent = String(event || 'loud').toUpperCase() === 'QUIET' ? 'QUIET' : 'LOUD';
+        value = this._clampNumber(value, 0, 255);
+        return this._request(`SOUNDTHRESH ${normalizedEvent} ${value}`, false, response => response === '1');
+    }
+
     /**
      * Show a 5x5 image on the micro:bit display.
      * @param {string} value - 25 character matrix string.
@@ -543,6 +562,10 @@ class MicrobitRealtimePeripheral{
             'microbit_whenButtonPressed',
             'microbit_whenPinTouched',
             'microbit_whenGesture',
+            'microbit_whenSound',
+            'microbit_whenLogo',
+            'microbit_microbit_whenSound',
+            'microbit_microbit_whenLogo',
             'microbit_microbit_whenMicrobitBegin',
             'microbit_microbit_whenButtonPressed',
             'microbit_microbit_whenPinTouched',
@@ -619,7 +642,9 @@ class MicrobitRealtimePeripheral{
             t0: parts[3] === '1',
             t1: parts[4] === '1',
             t2: parts[5] === '1',
-            gesture: this._normalizeGesture(parts[6])
+            gesture: this._normalizeGesture(parts[6]),
+            logo: parts[7] === '1',
+            soundEvent: String(parts[9] || '').toLowerCase()
         };
 
         this._triggerMicrobitButtonHats('a', state.a);
@@ -645,6 +670,19 @@ class MicrobitRealtimePeripheral{
             this._runtime.startHats('microbit_microbit_whenGesture', {
                 STA: state.gesture
             });
+        }
+
+
+        if (state.logo !== this._lastEventState.logo) {
+            const fields = {EVENT: state.logo ? 'pressed' : 'released'};
+            this._runtime.startHats('microbit_whenLogo', fields);
+            this._runtime.startHats('microbit_microbit_whenLogo', fields);
+        }
+
+        if (state.soundEvent === 'loud' || state.soundEvent === 'quiet') {
+            const fields = {EVENT: state.soundEvent};
+            this._runtime.startHats('microbit_whenSound', fields);
+            this._runtime.startHats('microbit_microbit_whenSound', fields);
         }
 
         this._lastEventState = state;
