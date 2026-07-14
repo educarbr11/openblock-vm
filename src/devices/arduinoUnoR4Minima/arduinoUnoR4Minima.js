@@ -694,7 +694,7 @@ class OpenBlockArduinoUnoR4MinimaDevice {
                         arguments: {
                             VALUE: {
                                 type: ArgumentType.STRING,
-                                defaultValue: 'Hello OpenBlock'
+                                defaultValue: 'DoGo Block'
                             },
                             EOL: {
                                 type: ArgumentType.STRING,

@@ -966,7 +966,7 @@ class OpenBlockArduinoUnoR4WifiDevice {
                         arguments: {
                             TEXT: {
                                 type: ArgumentType.STRING,
-                                defaultValue: 'Hello OpenBlock'
+                                defaultValue: 'DoGo Block'
                             }
                         }
                     },
@@ -1050,7 +1050,7 @@ class OpenBlockArduinoUnoR4WifiDevice {
                         arguments: {
                             VALUE: {
                                 type: ArgumentType.STRING,
-                                defaultValue: 'Hello OpenBlock'
+                                defaultValue: 'DoGo Block'
                             },
                             EOL: {
                                 type: ArgumentType.STRING,

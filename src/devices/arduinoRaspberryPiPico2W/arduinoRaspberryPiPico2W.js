@@ -755,7 +755,7 @@ class OpenBlockArduinoRaspberryPiPico2WDevice {
                             },
                             VALUE: {
                                 type: ArgumentType.STRING,
-                                defaultValue: 'Hello OpenBlock'
+                                defaultValue: 'DoGo Block'
                             },
                             EOL: {
                                 type: ArgumentType.STRING,
