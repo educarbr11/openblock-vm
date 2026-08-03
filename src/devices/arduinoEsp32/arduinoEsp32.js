@@ -5,6 +5,7 @@ const BlockType = require('../../extension-support/block-type');
 const ProgramModeType = require('../../extension-support/program-mode-type');
 
 const CommonPeripheral = require('../common/common-peripheral');
+const {ESP32_THEME, applyDeviceTheme} = require('../common/device-visual-theme');
 
 /**
  * The list of USB device filters.
@@ -892,7 +893,7 @@ class OpenBlockArduinoEsp32Device {
      * @returns {Array.<object>} metadata for this extension and its blocks.
      */
     getInfo () {
-        return [
+        return applyDeviceTheme([
             {
                 id: 'pin',
                 name: formatMessage({
@@ -1454,7 +1455,7 @@ class OpenBlockArduinoEsp32Device {
                     }
                 }
             }
-        ];
+        ], ESP32_THEME);
     }
 
     /**
