@@ -582,6 +582,10 @@ const serialize = function (runtime, targetId) {
         obj.machineLearning = runtime.machineLearningModel;
     }
 
+    if (runtime.handPoseGestureModel) {
+        obj.handPoseDetection = runtime.handPoseGestureModel;
+    }
+
     // Assemble extension list
     obj.extensions = runtime.getLoadedScratchExtension();
 
@@ -1277,6 +1281,16 @@ const deserialize = function (json, runtime, zip, isSingleSprite) {
     }
     runtime.machineLearningModel = json.machineLearning || null;
     runtime.machineLearningPrediction = null;
+    runtime.handPoseGestureModel = json.handPoseDetection || null;
+    if (runtime.handPoseGestureModel &&
+        (runtime.handPoseGestureModel.version !== 1 ||
+        runtime.handPoseGestureModel.featureVersion !== 'canonical-landmarks-v1')) {
+        runtime.handPoseGestureModel = Object.assign({}, runtime.handPoseGestureModel, {
+            active: false,
+            incompatible: true
+        });
+    }
+    runtime.handPoseGesturePrediction = null;
 
     // First keep track of the current target order in the json,
     // then sort by the layer order property before parsing the targets

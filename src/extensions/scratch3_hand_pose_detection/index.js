@@ -37,6 +37,7 @@ const POINT_ALIASES = POINTS.reduce((aliases, point) => {
 }, {});
 
 const GESTURES = ['mão aberta', 'mão fechada', 'apontando', 'pinça'];
+const DEFAULT_CUSTOM_GESTURE_ID = 'other';
 
 class Scratch3HandPoseDetectionBlocks {
     constructor (runtime) {
@@ -62,6 +63,24 @@ class Scratch3HandPoseDetectionBlocks {
             menuIconURI: blockIconURI,
             blocks: [
                 {
+                    opcode: 'startDetection',
+                    text: formatMessage({
+                        id: 'handPoseDetection.startDetection',
+                        default: 'start hand detector',
+                        description: 'Command that starts the hand detector'
+                    }),
+                    blockType: BlockType.COMMAND
+                },
+                {
+                    opcode: 'stopDetection',
+                    text: formatMessage({
+                        id: 'handPoseDetection.stopDetection',
+                        default: 'stop hand detector',
+                        description: 'Command that stops the hand detector'
+                    }),
+                    blockType: BlockType.COMMAND
+                },
+                {
                     opcode: 'openResult',
                     text: formatMessage({
                         id: 'handPoseDetection.openResult',
@@ -71,7 +90,163 @@ class Scratch3HandPoseDetectionBlocks {
                     blockType: BlockType.COMMAND
                 },
                 {
+                    opcode: 'openGestureTrainer',
+                    text: formatMessage({
+                        id: 'handPoseDetection.openGestureTrainer',
+                        default: 'open gesture training',
+                        description: 'Command that opens custom hand gesture training'
+                    }),
+                    blockType: BlockType.COMMAND
+                },
+                '---',
+                {
+                    opcode: 'createTrainedGesture',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.createTrainedGesture',
+                        default: 'create gesture [NAME]',
+                        description: 'Command that creates a custom hand gesture'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        NAME: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'Número 1'
+                        }
+                    }
+                },
+                {
+                    opcode: 'addGestureExample',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.addGestureExample',
+                        default: 'add example to gesture [GESTURE]',
+                        description: 'Command that captures one custom gesture example'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        }
+                    }
+                },
+                {
+                    opcode: 'captureGestureExamplesForSeconds',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.captureGestureExamplesForSeconds',
+                        default: 'capture examples of gesture [GESTURE] for [SECONDS] seconds',
+                        description: 'Command that captures custom gesture examples for a duration'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        },
+                        SECONDS: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 3
+                        }
+                    }
+                },
+                {
+                    opcode: 'clearGestureExamples',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.clearGestureExamples',
+                        default: 'delete examples of gesture [GESTURE]',
+                        description: 'Command that deletes custom gesture examples'
+                    }),
+                    blockType: BlockType.COMMAND,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        }
+                    }
+                },
+                {
+                    opcode: 'gestureExampleCount',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.gestureExampleCount',
+                        default: 'number of examples of gesture [GESTURE]',
+                        description: 'Reporter for custom gesture example count'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        }
+                    }
+                },
+                {
+                    opcode: 'gestureModelReady',
+                    hideFromPalette: true,
+                    text: formatMessage({
+                        id: 'handPoseDetection.gestureModelReady',
+                        default: 'gesture model ready?',
+                        description: 'Boolean reporter for custom gesture model readiness'
+                    }),
+                    blockType: BlockType.BOOLEAN
+                },
+                {
+                    opcode: 'whenTrainedGestureDetected',
+                    text: formatMessage({
+                        id: 'handPoseDetection.whenTrainedGestureDetected',
+                        default: 'when trained gesture [GESTURE] is recognized ' +
+                            'with confidence greater than [CONFIDENCE] %',
+                        description: 'Hat that triggers for a trained hand gesture'
+                    }),
+                    blockType: BlockType.HAT,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        },
+                        CONFIDENCE: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 80
+                        }
+                    }
+                },
+                {
+                    opcode: 'recognizedTrainedGesture',
+                    text: formatMessage({
+                        id: 'handPoseDetection.recognizedTrainedGesture',
+                        default: 'recognized trained gesture',
+                        description: 'Reporter for the recognized trained hand gesture'
+                    }),
+                    blockType: BlockType.REPORTER
+                },
+                {
+                    opcode: 'trainedGestureConfidence',
+                    text: formatMessage({
+                        id: 'handPoseDetection.trainedGestureConfidence',
+                        default: 'confidence of trained gesture [GESTURE]',
+                        description: 'Reporter for confidence of a trained hand gesture'
+                    }),
+                    blockType: BlockType.REPORTER,
+                    arguments: {
+                        GESTURE: {
+                            type: ArgumentType.STRING,
+                            menu: 'TRAINED_GESTURES',
+                            defaultValue: this._defaultTrainedGesture()
+                        }
+                    }
+                },
+                '---',
+                {
                     opcode: 'whenGestureDetected',
+                    hideFromPalette: true,
                     text: formatMessage({
                         id: 'handPoseDetection.whenGestureDetected',
                         default: 'when detect gesture [GESTURE] with confidence > [CONFIDENCE]',
@@ -110,6 +285,7 @@ class Scratch3HandPoseDetectionBlocks {
                 },
                 {
                     opcode: 'recognizedGesture',
+                    hideFromPalette: true,
                     text: formatMessage({
                         id: 'handPoseDetection.recognizedGesture',
                         default: 'recognized gesture',
@@ -195,6 +371,10 @@ class Scratch3HandPoseDetectionBlocks {
                 GESTURE: {
                     acceptReporters: true,
                     items: GESTURES
+                },
+                TRAINED_GESTURES: {
+                    acceptReporters: true,
+                    items: this._trainedGestureMenu()
                 }
             }
         }];
@@ -206,6 +386,84 @@ class Scratch3HandPoseDetectionBlocks {
         } else {
             this.runtime.emit('HAND_POSE_DETECTION_OPEN_RESULT');
         }
+    }
+
+    startDetection () {
+        if (this.runtime.vm && typeof this.runtime.vm.startHandPoseDetection === 'function') {
+            return this.runtime.vm.startHandPoseDetection();
+        }
+        this.openResult();
+    }
+
+    stopDetection () {
+        if (this.runtime.vm && typeof this.runtime.vm.stopHandPoseDetection === 'function') {
+            return this.runtime.vm.stopHandPoseDetection();
+        }
+    }
+
+    openGestureTrainer () {
+        if (this.runtime.vm && typeof this.runtime.vm.openHandPoseGestureTrainer === 'function') {
+            this.runtime.vm.openHandPoseGestureTrainer();
+        } else {
+            this.runtime.emit('HAND_POSE_DETECTION_OPEN_TRAINER');
+        }
+    }
+
+    createTrainedGesture (args) {
+        const name = Cast.toString(args.NAME).trim()
+            .slice(0, 40);
+        if (!name || !this.runtime.vm || typeof this.runtime.vm.createHandPoseGesture !== 'function') return;
+        this.openGestureTrainer();
+        return this.runtime.vm.createHandPoseGesture(name);
+    }
+
+    addGestureExample (args) {
+        if (!this.runtime.vm || typeof this.runtime.vm.captureHandPoseGestureExample !== 'function') return;
+        this.openGestureTrainer();
+        return this.runtime.vm.captureHandPoseGestureExample(Cast.toString(args.GESTURE));
+    }
+
+    captureGestureExamplesForSeconds (args) {
+        if (!this.runtime.vm || typeof this.runtime.vm.captureHandPoseGestureExamplesForSeconds !== 'function') return;
+        const seconds = Math.max(1, Math.min(10, Cast.toNumber(args.SECONDS) || 3));
+        this.openGestureTrainer();
+        return this.runtime.vm.captureHandPoseGestureExamplesForSeconds(Cast.toString(args.GESTURE), seconds);
+    }
+
+    clearGestureExamples (args) {
+        if (!this.runtime.vm || typeof this.runtime.vm.clearHandPoseGestureExamples !== 'function') return;
+        return this.runtime.vm.clearHandPoseGestureExamples(Cast.toString(args.GESTURE));
+    }
+
+    gestureExampleCount (args) {
+        const classId = Cast.toString(args.GESTURE);
+        return this._examples().filter(example => example && example.classId === classId).length;
+    }
+
+    gestureModelReady () {
+        const model = this._gestureModel();
+        if (!model.active || model.incompatible) return false;
+        return this._gestureClasses().length >= 2 && this._gestureClasses().every(item =>
+            this._examples().filter(example => example && example.classId === item.id).length >= 20
+        );
+    }
+
+    whenTrainedGestureDetected (args) {
+        const classId = Cast.toString(args.GESTURE);
+        const prediction = this._gesturePrediction();
+        return prediction.classId === classId &&
+            Cast.toNumber((prediction.confidences || {})[classId] || 0) > Cast.toNumber(args.CONFIDENCE);
+    }
+
+    recognizedTrainedGesture (args, util) {
+        this._openResultIfStackClick(util);
+        const prediction = this._gesturePrediction();
+        return prediction.classId === DEFAULT_CUSTOM_GESTURE_ID ? '' : (prediction.label || '');
+    }
+
+    trainedGestureConfidence (args) {
+        const classId = Cast.toString(args.GESTURE);
+        return Math.round(Cast.toNumber((this._gesturePrediction().confidences || {})[classId] || 0));
     }
 
     handDetected (args, util) {
@@ -277,6 +535,48 @@ class Scratch3HandPoseDetectionBlocks {
     _normalizePointName (pointName) {
         const key = Cast.toString(pointName);
         return POINT_ALIASES[key] || key;
+    }
+
+    _gestureModel () {
+        return this.runtime.handPoseGestureModel || {};
+    }
+
+    _gesturePrediction () {
+        return this.runtime.handPoseGesturePrediction || {
+            classId: '',
+            label: '',
+            confidences: {}
+        };
+    }
+
+    _gestureClasses () {
+        const classes = this._gestureModel().classes;
+        return Array.isArray(classes) ? classes : [];
+    }
+
+    _examples () {
+        const examples = this._gestureModel().examples;
+        return Array.isArray(examples) ? examples : [];
+    }
+
+    _defaultTrainedGesture () {
+        const classes = this._gestureClasses();
+        const customClass = classes.find(item => item && !item.protected);
+        return customClass ? customClass.id : DEFAULT_CUSTOM_GESTURE_ID;
+    }
+
+    _trainedGestureMenu () {
+        const classes = this._gestureClasses();
+        if (!classes.length) {
+            return [{
+                text: 'Outro',
+                value: DEFAULT_CUSTOM_GESTURE_ID
+            }];
+        }
+        return classes.map(item => ({
+            text: item.name,
+            value: item.id
+        }));
     }
 }
 

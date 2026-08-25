@@ -57,6 +57,9 @@ class VirtualMachine extends EventEmitter {
         this.runtime.machineLearningModel = null;
         this.runtime.machineLearningPrediction = null;
         this.runtime.handPoseDetectionResult = null;
+        this.runtime.handPoseGestureModel = null;
+        this.runtime.handPoseGesturePrediction = null;
+        this._handPoseTrainingController = null;
         centralDispatch.setService('runtime', this.runtime).catch(e => {
             log.error(`Failed to register runtime service: ${JSON.stringify(e)}`);
         });
@@ -207,6 +210,9 @@ class VirtualMachine extends EventEmitter {
         this.runtime.on('HAND_POSE_DETECTION_OPEN_RESULT', () => {
             this.emit('HAND_POSE_DETECTION_OPEN_RESULT');
         });
+        this.runtime.on('HAND_POSE_DETECTION_OPEN_TRAINER', () => {
+            this.emit('HAND_POSE_DETECTION_OPEN_TRAINER');
+        });
 
         this.extensionManager = new ExtensionManager(this.runtime);
 
@@ -273,6 +279,8 @@ class VirtualMachine extends EventEmitter {
         this.runtime.machineLearningModel = null;
         this.runtime.machineLearningPrediction = null;
         this.runtime.handPoseDetectionResult = null;
+        this.runtime.handPoseGestureModel = null;
+        this.runtime.handPoseGesturePrediction = null;
         this.editingTarget = null;
         this.emitTargetsUpdate(false /* Don't emit project change */);
         this.extensionManager.clearDevice();
@@ -310,6 +318,68 @@ class VirtualMachine extends EventEmitter {
 
     openHandPoseDetectionResult () {
         this.emit('HAND_POSE_DETECTION_OPEN_RESULT');
+    }
+
+    setHandPoseGestureModel (data, options) {
+        const settings = Object.assign({
+            emitProjectChanged: true,
+            updateToolbox: true
+        }, options);
+        this.runtime.handPoseGestureModel = data || null;
+        if (settings.emitProjectChanged) this.runtime.emitProjectChanged();
+        if (settings.updateToolbox) this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
+    }
+
+    getHandPoseGestureModel () {
+        return this.runtime.handPoseGestureModel || null;
+    }
+
+    setHandPoseGesturePrediction (prediction) {
+        this.runtime.handPoseGesturePrediction = prediction || null;
+    }
+
+    getHandPoseGesturePrediction () {
+        return this.runtime.handPoseGesturePrediction || null;
+    }
+
+    setHandPoseTrainingController (controller) {
+        this._handPoseTrainingController = controller || null;
+    }
+
+    openHandPoseGestureTrainer () {
+        this.emit('HAND_POSE_DETECTION_OPEN_TRAINER');
+    }
+
+    startHandPoseDetection () {
+        return this._callHandPoseTrainingController('start');
+    }
+
+    stopHandPoseDetection () {
+        return this._callHandPoseTrainingController('stop');
+    }
+
+    createHandPoseGesture (name) {
+        return this._callHandPoseTrainingController('createGesture', name);
+    }
+
+    captureHandPoseGestureExample (classId) {
+        return this._callHandPoseTrainingController('captureExample', classId);
+    }
+
+    captureHandPoseGestureExamplesForSeconds (classId, seconds) {
+        return this._callHandPoseTrainingController('captureForSeconds', classId, seconds);
+    }
+
+    clearHandPoseGestureExamples (classId) {
+        return this._callHandPoseTrainingController('clearExamples', classId);
+    }
+
+    _callHandPoseTrainingController (method, ...args) {
+        const controller = this._handPoseTrainingController;
+        if (!controller || typeof controller[method] !== 'function') {
+            return Promise.resolve(null);
+        }
+        return Promise.resolve(controller[method](...args));
     }
 
     /**

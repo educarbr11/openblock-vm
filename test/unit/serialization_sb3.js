@@ -26,6 +26,52 @@ test('serialize', t => {
         });
 });
 
+test('serialize and deserialize custom hand gesture model', t => {
+    const vm = new VirtualMachine();
+    vm.loadProject(readFileToBuffer(exampleProjectPath))
+        .then(() => {
+            vm.runtime.handPoseGestureModel = {
+                version: 1,
+                featureVersion: 'canonical-landmarks-v1',
+                classes: [
+                    {id: 'other', name: 'Outro', protected: true},
+                    {id: 'number-one', name: 'Número 1'}
+                ],
+                examples: [{classId: 'number-one', vector: [0, 0.5, 1]}],
+                active: true
+            };
+            const serialized = sb3.serialize(vm.runtime);
+            const restoredRuntime = new Runtime();
+            return sb3.deserialize(JSON.parse(JSON.stringify(serialized)), restoredRuntime)
+                .then(() => {
+                    t.same(restoredRuntime.handPoseGestureModel, serialized.handPoseDetection);
+                    t.strictEqual(restoredRuntime.handPoseGesturePrediction, null);
+                    t.end();
+                });
+        });
+});
+
+test('incompatible custom hand gesture model is restored disabled', t => {
+    const vm = new VirtualMachine();
+    vm.loadProject(readFileToBuffer(exampleProjectPath))
+        .then(() => {
+            const serialized = sb3.serialize(vm.runtime);
+            serialized.handPoseDetection = {
+                version: 99,
+                featureVersion: 'future-landmarks',
+                classes: [],
+                examples: [],
+                active: true
+            };
+            const restoredRuntime = new Runtime();
+            return sb3.deserialize(JSON.parse(JSON.stringify(serialized)), restoredRuntime).then(() => {
+                t.strictEqual(restoredRuntime.handPoseGestureModel.active, false);
+                t.strictEqual(restoredRuntime.handPoseGestureModel.incompatible, true);
+                t.end();
+            });
+        });
+});
+
 test('deserialize', t => {
     const vm = new VirtualMachine();
     sb3.deserialize('', vm.runtime).then(({targets}) => {
