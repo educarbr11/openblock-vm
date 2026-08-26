@@ -134,15 +134,19 @@ class Scratch3MachineLearningBlocks {
 
     _defaultClass () {
         const labels = this._labels();
-        return labels.length ? labels[0] : 'class 1';
+        return labels.length ? labels[0] : formatMessage({
+            id: 'machineLearning.defaultTraining',
+            default: 'Training 1',
+            description: 'Default name of the first machine learning training'
+        });
     }
 
     _classMenu () {
         const labels = this._labels();
         if (!labels.length) {
             return [{
-                text: 'class 1',
-                value: 'class 1'
+                text: this._defaultClass(),
+                value: this._defaultClass()
             }];
         }
         return labels.map(label => ({
