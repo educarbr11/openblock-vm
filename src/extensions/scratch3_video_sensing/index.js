@@ -99,12 +99,22 @@ class Scratch3VideoSensingBlocks {
          */
         this.firstInstall = true;
 
+        /**
+         * Track the extension lifecycle so removing it also stops background work.
+         * @type {boolean}
+         */
+        this._disposed = false;
+        this._loopTimeout = null;
+        this._boundLoop = this._loop.bind(this);
+        this._boundUpdateVideoDisplay = this.updateVideoDisplay.bind(this);
+        this._boundReset = this.reset.bind(this);
+
         if (this.runtime.ioDevices) {
             // Configure the video device with values from globally stored locations.
-            this.runtime.on(Runtime.PROJECT_LOADED, this.updateVideoDisplay.bind(this));
+            this.runtime.on(Runtime.PROJECT_LOADED, this._boundUpdateVideoDisplay);
 
             // Clear target motion state values when the project starts.
-            this.runtime.on(Runtime.PROJECT_RUN_START, this.reset.bind(this));
+            this.runtime.on(Runtime.PROJECT_RUN_START, this._boundReset);
 
             // Kick off looping the analysis logic.
             this._loop();
@@ -238,7 +248,12 @@ class Scratch3VideoSensingBlocks {
      * @private
      */
     _loop () {
-        setTimeout(this._loop.bind(this), Math.max(this.runtime.currentStepTime, Scratch3VideoSensingBlocks.INTERVAL));
+        if (this._disposed) return;
+
+        this._loopTimeout = setTimeout(
+            this._boundLoop,
+            Math.max(this.runtime.currentStepTime, Scratch3VideoSensingBlocks.INTERVAL)
+        );
 
         // Add frame to detector
         const time = Date.now();
@@ -589,6 +604,30 @@ class Scratch3VideoSensingBlocks {
         const transparency = Cast.toNumber(args.TRANSPARENCY);
         this.globalVideoTransparency = transparency;
         this.runtime.ioDevices.video.setPreviewGhost(transparency);
+    }
+
+    /**
+     * Stop camera access and background work when the extension is removed.
+     * This method is intentionally idempotent because project/device cleanup can
+     * request extension removal more than once.
+     */
+    dispose () {
+        if (this._disposed) return;
+        this._disposed = true;
+
+        if (this._loopTimeout !== null) {
+            clearTimeout(this._loopTimeout);
+            this._loopTimeout = null;
+        }
+
+        this.runtime.removeListener(Runtime.PROJECT_LOADED, this._boundUpdateVideoDisplay);
+        this.runtime.removeListener(Runtime.PROJECT_RUN_START, this._boundReset);
+
+        this.globalVideoState = VideoState.OFF;
+        if (this.runtime.ioDevices && this.runtime.ioDevices.video) {
+            this.runtime.ioDevices.video.disableVideo();
+        }
+        this.reset();
     }
 }
 

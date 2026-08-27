@@ -188,6 +188,14 @@ class ExtensionManager {
         this._loadedExtensions = new Map();
 
         /**
+         * Map of loaded internal extension instances. Keeping the instance allows
+         * extensions which own external resources to release them when unloaded.
+         * @type {Map.<string, object>}
+         * @private
+         */
+        this._loadedExtensionInstances = new Map();
+
+        /**
          * Set of loaded device URLs/IDs (equivalent for built-in devices).
          * @type {Set.<string>}
          * @private
@@ -280,6 +288,7 @@ class ExtensionManager {
         const extensionInstance = new extension(this.runtime);
         const serviceName = this._registerInternalExtension(extensionInstance);
         this._loadedExtensions.set(extensionId, serviceName);
+        this._loadedExtensionInstances.set(extensionId, extensionInstance);
         this.runtime.addScratchExtension(extensionId);
     }
 
@@ -305,6 +314,7 @@ class ExtensionManager {
             const extensionInstance = new extension(this.runtime);
             const serviceName = this._registerInternalExtension(extensionInstance);
             this._loadedExtensions.set(extensionURL, serviceName);
+            this._loadedExtensionInstances.set(extensionURL, extensionInstance);
             this.runtime.addScratchExtension(extensionURL);
             return Promise.resolve();
         }
@@ -323,6 +333,7 @@ class ExtensionManager {
      * @param {string} extensionURL - the URL for the extension to load OR the ID of an internal extension
      */
     unloadExtension (extensionURL) {
+        this._disposeExtension(extensionURL);
         this._loadedExtensions.delete(extensionURL);
         this.runtime.removeScratchExtension(extensionURL);
     }
@@ -331,8 +342,29 @@ class ExtensionManager {
      * Unload all extension
      */
     clearExtensions () {
+        Array.from(this._loadedExtensionInstances.keys()).forEach(extensionId => {
+            this._disposeExtension(extensionId);
+        });
         this._loadedExtensions.clear();
         this.runtime.clearScratchExtension();
+    }
+
+    /**
+     * Dispose an internal extension which owns resources such as timers or media streams.
+     * Extensions without a dispose lifecycle continue to unload as before.
+     * @param {string} extensionId - ID of the extension to dispose
+     * @private
+     */
+    _disposeExtension (extensionId) {
+        const extensionInstance = this._loadedExtensionInstances.get(extensionId);
+        this._loadedExtensionInstances.delete(extensionId);
+        if (!extensionInstance || typeof extensionInstance.dispose !== 'function') return;
+
+        try {
+            extensionInstance.dispose();
+        } catch (error) {
+            log.warn(`Could not dispose extension ${extensionId}: ${error.message || error}`);
+        }
     }
 
     /**
