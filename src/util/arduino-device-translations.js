@@ -68,6 +68,8 @@ const ptBrCommonSuffixes = {
     'serial.multiSerialAvailable': 'quantidade de dados disponíveis na serial [NO]',
     'serial.serialReadAByte': 'ler um byte da serial',
     'serial.multiSerialReadAByte': 'ler um byte da serial [NO]',
+    'serial.serialReadData': 'comunicação serial: ler dados',
+    'serial.multiSerialReadData': 'comunicação serial [NO]: ler dados',
     'data.dataMap': 'mapear [DATA] de ([ARG0], [ARG1]) para ([ARG2], [ARG3])',
     'data.dataConstrain': 'restringir [DATA] entre ([ARG0], [ARG1])',
     'data.dataConvert': 'converter [DATA] para [TYPE]',

@@ -804,6 +804,23 @@ class OpenBlockArduinoRaspberryPiPico2Device {
                         },
                         blockType: BlockType.REPORTER,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'multiSerialReadData',
+                        text: formatMessage({
+                            id: 'arduinoRaspberryPiPico2.serial.multiSerialReadData',
+                            default: 'serial communication [NO]: read data',
+                            description: 'arduinoRaspberryPiPico2 serial read available data'
+                        }),
+                        arguments: {
+                            NO: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'serialNo',
+                                defaultValue: SerialNo.USB
+                            }
+                        },
+                        blockType: BlockType.REPORTER,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

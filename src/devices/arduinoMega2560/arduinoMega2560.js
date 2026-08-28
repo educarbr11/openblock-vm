@@ -1124,6 +1124,23 @@ class OpenBlockArduinoMega2560Device {
                         },
                         blockType: BlockType.REPORTER,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'multiSerialReadData',
+                        text: formatMessage({
+                            id: 'arduinoMega2560.serial.multiSerialReadData',
+                            default: 'serial communication [NO]: read data',
+                            description: 'arduinoMega2560 serial read available data'
+                        }),
+                        arguments: {
+                            NO: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'serialNo',
+                                defaultValue: SerialNo.Serial0
+                            }
+                        },
+                        blockType: BlockType.REPORTER,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

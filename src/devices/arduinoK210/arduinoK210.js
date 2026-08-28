@@ -853,6 +853,23 @@ class OpenBlockArduinoK210Device {
                         },
                         blockType: BlockType.REPORTER,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'multiSerialReadData',
+                        text: formatMessage({
+                            id: 'arduinoK210.serial.multiSerialReadData',
+                            default: 'serial communication [NO]: read data',
+                            description: 'arduinoK210 serial read available data'
+                        }),
+                        arguments: {
+                            NO: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'serialNo',
+                                defaultValue: SerialNo.Serial0
+                            }
+                        },
+                        blockType: BlockType.REPORTER,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

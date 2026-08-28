@@ -969,6 +969,17 @@ class OpenBlockArduinoLeonardoDevice {
                         blockType: BlockType.REPORTER,
                         disableMonitor: true,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'serialReadData',
+                        text: formatMessage({
+                            id: 'arduinoLeonardo.serial.serialReadData',
+                            default: 'serial communication: read data',
+                            description: 'arduinoLeonardo serial read available data'
+                        }),
+                        blockType: BlockType.REPORTER,
+                        disableMonitor: true,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

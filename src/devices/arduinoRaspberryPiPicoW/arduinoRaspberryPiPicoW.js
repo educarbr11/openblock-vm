@@ -798,6 +798,23 @@ class OpenBlockArduinoRaspberryPiPicoWDevice {
                         },
                         blockType: BlockType.REPORTER,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'multiSerialReadData',
+                        text: formatMessage({
+                            id: 'arduinoRaspberryPiPicoW.serial.multiSerialReadData',
+                            default: 'serial communication [NO]: read data',
+                            description: 'arduinoRaspberryPiPicoW serial read available data'
+                        }),
+                        arguments: {
+                            NO: {
+                                type: ArgumentType.NUMBER,
+                                menu: 'serialNo',
+                                defaultValue: SerialNo.USB
+                            }
+                        },
+                        blockType: BlockType.REPORTER,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

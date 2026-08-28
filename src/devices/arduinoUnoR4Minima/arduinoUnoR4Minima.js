@@ -725,6 +725,17 @@ class OpenBlockArduinoUnoR4MinimaDevice {
                         blockType: BlockType.REPORTER,
                         disableMonitor: true,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'serialReadData',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Minima.serial.serialReadData',
+                            default: 'serial communication: read data',
+                            description: 'arduinoUnoR4Minima serial read available data'
+                        }),
+                        blockType: BlockType.REPORTER,
+                        disableMonitor: true,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {

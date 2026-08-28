@@ -1081,6 +1081,17 @@ class OpenBlockArduinoUnoR4WifiDevice {
                         blockType: BlockType.REPORTER,
                         disableMonitor: true,
                         programMode: [ProgramModeType.UPLOAD]
+                    },
+                    {
+                        opcode: 'serialReadData',
+                        text: formatMessage({
+                            id: 'arduinoUnoR4Wifi.serial.serialReadData',
+                            default: 'serial communication: read data',
+                            description: 'arduinoUnoR4Wifi serial read available data'
+                        }),
+                        blockType: BlockType.REPORTER,
+                        disableMonitor: true,
+                        programMode: [ProgramModeType.UPLOAD]
                     }
                 ],
                 menus: {
