@@ -502,6 +502,10 @@ class OpenBlockArduinoMega2560Device {
         ];
     }
 
+    get DIGITAL_PINS_MENU () {
+        return this.PINS_MENU.filter(pin => !/^A\d+$/.test(pin.value));
+    }
+
     get ANALOG_PINS_MENU () {
         return [
             {
@@ -873,7 +877,7 @@ class OpenBlockArduinoMega2560Device {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
+                                menu: 'digitalPins',
                                 defaultValue: Pins.D0
                             },
                             LEVEL: {
@@ -916,7 +920,7 @@ class OpenBlockArduinoMega2560Device {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
+                                menu: 'digitalPins',
                                 defaultValue: Pins.D0
                             }
                         }
@@ -1006,6 +1010,10 @@ class OpenBlockArduinoMega2560Device {
                     pins: {
                         acceptReporters: true,
                         items: this.PINS_MENU
+                    },
+                    digitalPins: {
+                        acceptReporters: true,
+                        items: this.DIGITAL_PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU

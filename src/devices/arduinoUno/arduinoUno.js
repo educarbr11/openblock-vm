@@ -298,6 +298,10 @@ class OpenBlockArduinoUnoDevice {
         ];
     }
 
+    get DIGITAL_PINS_MENU () {
+        return this.PINS_MENU.filter(pin => !/^A\d+$/.test(pin.value));
+    }
+
     get ANALOG_PINS_MENU () {
         return [
             {
@@ -629,7 +633,7 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
+                                menu: 'digitalPins',
                                 defaultValue: Pins.D0
                             },
                             LEVEL: {
@@ -672,7 +676,7 @@ class OpenBlockArduinoUnoDevice {
                         arguments: {
                             PIN: {
                                 type: ArgumentType.STRING,
-                                menu: 'pins',
+                                menu: 'digitalPins',
                                 defaultValue: Pins.D0
                             }
                         }
@@ -855,6 +859,10 @@ class OpenBlockArduinoUnoDevice {
                     pins: {
                         acceptReporters: true,
                         items: this.PINS_MENU
+                    },
+                    digitalPins: {
+                        acceptReporters: true,
+                        items: this.DIGITAL_PINS_MENU
                     },
                     mode: {
                         items: this.MODE_MENU
