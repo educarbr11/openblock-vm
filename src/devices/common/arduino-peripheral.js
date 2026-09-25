@@ -98,6 +98,7 @@ class ArduinoPeripheral{
         this._connectionType = 'link';
         this._writeQueue = Promise.resolve();
         this._configuredServoPins = {};
+        this._tempo = 60;
 
         /**
          * The id of the peripheral this peripheral belongs to.
@@ -678,6 +679,33 @@ class ArduinoPeripheral{
             });
         }
         return Promise.resolve();
+    }
+
+    /**
+     * Set the tempo used by beat-based tone blocks.
+     * @param {number|string} tempo - tempo in beats per minute.
+     */
+    setTempo (tempo) {
+        tempo = parseFloat(tempo);
+        if (isNaN(tempo)) {
+            return;
+        }
+        this._tempo = Math.max(20, Math.min(500, tempo));
+    }
+
+    /**
+     * Play a buzzer tone for a musical beat duration.
+     * @param {PIN} pin - the buzzer pin.
+     * @param {number|string} frequency - the tone frequency.
+     * @param {number|string} beats - the duration in beats.
+     * @return {Promise} - resolves after the tone is stopped.
+     */
+    playToneForBeat (pin, frequency, beats) {
+        beats = parseFloat(beats);
+        if (isNaN(beats) || beats < 0) {
+            beats = 0;
+        }
+        return this.playToneForSeconds(pin, frequency, beats * (60 / this._tempo));
     }
 
     /**

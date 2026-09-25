@@ -780,6 +780,21 @@ class OpenBlockArduinoLeonardoDevice {
                         }
                     },
                     {
+                        opcode: 'setTempo',
+                        text: formatMessage({
+                            id: 'arduinoLeonardo.pins.setTempo',
+                            default: 'set tempo to [TEMPO] bpm',
+                            description: 'arduinoLeonardo set tempo in beats per minute'
+                        }),
+                        blockType: BlockType.COMMAND,
+                        arguments: {
+                            TEMPO: {
+                                type: ArgumentType.NUMBER,
+                                defaultValue: 60
+                            }
+                        }
+                    },
+                    {
                         opcode: 'stopTone',
                         text: formatMessage({
                             id: 'arduinoLeonardo.pins.stopTone',
@@ -1198,12 +1213,20 @@ class OpenBlockArduinoLeonardoDevice {
     }
 
     /**
-     * Play buzzer tone for musical beat length. One beat is 0.5 seconds.
+     * Set the tempo used by beat-based tones.
+     * @param {object} args - the block's arguments.
+     */
+    setTempo (args) {
+        this._peripheral.setTempo(args.TEMPO);
+    }
+
+    /**
+     * Play buzzer tone for musical beat length.
      * @param {object} args - the block's arguments.
      * @return {Promise} - a Promise that resolves after the tone is done.
      */
     playToneForBeat (args) {
-        return this._peripheral.playToneForSeconds(args.PIN, args.NOTE, parseFloat(args.BEAT) * 0.5);
+        return this._peripheral.playToneForBeat(args.PIN, args.NOTE, args.BEAT);
     }
 
     /**
