@@ -291,7 +291,21 @@ const loadCostumeFromAsset = function (costume, runtime, optVersion) {
                 return loadVector_(costume, runtime);
             });
     }
-    return loadBitmap_(costume, runtime, rotationCenter, optVersion);
+    return loadBitmap_(costume, runtime, rotationCenter, optVersion)
+        .catch(error => {
+            const message = error && error.message ? error.message : String(error);
+            log.warn(`Error loading bitmap image: ${message}`);
+            const defaultAssetId = runtime.storage.defaultAssetId.ImageBitmap;
+            const defaultAsset = runtime.storage.get(defaultAssetId);
+            if (!defaultAsset || costume.assetId === defaultAssetId) {
+                return Promise.reject(error);
+            }
+            costume.assetId = defaultAssetId;
+            costume.asset = defaultAsset;
+            costume.dataFormat = AssetType.ImageBitmap.runtimeFormat;
+            costume.md5 = `${defaultAssetId}.${costume.dataFormat}`;
+            return loadBitmap_(costume, runtime);
+        });
 };
 
 /**
