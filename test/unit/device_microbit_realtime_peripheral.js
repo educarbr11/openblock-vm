@@ -39,19 +39,75 @@ test('parse realtime response lines', t => {
     t.end();
 });
 
-test('button reporter sends BTN and parses OK 1 as true', t => {
+test('button reporter returns cached state without waiting for USB', t => {
     const {peripheral} = makePeripheral();
+    let resolveRequest;
+    let requestCount = 0;
+    peripheral._isRealtimeConnected = true;
+    peripheral.isConnected = () => true;
     peripheral._request = (command, fallback, parser) => {
+        requestCount++;
         t.equal(command, 'BTN A');
         t.equal(fallback, false);
-        return Promise.resolve(parser('1'));
+        return new Promise(resolve => {
+            resolveRequest = value => resolve(parser(value));
+        });
     };
 
-    peripheral.buttonIsPressed('a')
-        .then(value => {
-            t.equal(value, true);
-            t.end();
+    t.equal(peripheral.buttonIsPressed('a'), false);
+    t.equal(peripheral.buttonIsPressed('a'), false);
+    t.equal(requestCount, 1, 'coalesces reads while a refresh is pending');
+
+    resolveRequest('1');
+    Promise.resolve().then(() => {
+        t.equal(peripheral.buttonIsPressed('a'), true);
+        t.equal(requestCount, 1, 'respects the input refresh interval');
+        t.end();
+    });
+});
+
+test('accelerometer reporter refreshes in background', t => {
+    const {peripheral} = makePeripheral();
+    let resolveRequest;
+    peripheral._isRealtimeConnected = true;
+    peripheral.isConnected = () => true;
+    peripheral._request = (command, fallback, parser) => {
+        t.equal(command, 'ACC X');
+        t.equal(fallback, 0);
+        return new Promise(resolve => {
+            resolveRequest = value => resolve(parser(value));
         });
+    };
+
+    t.equal(peripheral.axisAcceleration('x'), 0);
+    resolveRequest('384');
+    Promise.resolve().then(() => {
+        t.equal(peripheral.axisAcceleration('x'), 384);
+        t.end();
+    });
+});
+
+test('poll response updates cached button reporters', t => {
+    const {peripheral} = makePeripheral();
+    peripheral._handlePollEvent('1,0,0,0,0,0,');
+
+    t.equal(peripheral.buttonIsPressed('a'), true);
+    t.equal(peripheral.buttonIsPressed('b'), false);
+    t.end();
+});
+
+test('stopping realtime clears cached inputs', t => {
+    const {peripheral} = makePeripheral();
+    peripheral._inputCache['button:a'] = true;
+    peripheral._inputCache['acceleration:x'] = 512;
+
+    peripheral._stopRealtime();
+
+    t.equal(peripheral.buttonIsPressed('a'), false);
+    t.equal(peripheral.axisAcceleration('x'), 0);
+    t.same(peripheral._inputCache, {});
+    t.same(peripheral._inputRefreshState, {});
+    t.end();
 });
 
 test('poll events trigger microbit button hat', t => {
@@ -114,46 +170,38 @@ test('poll events trigger logo and sound hats', t => {
     t.end();
 });
 
-test('poll does not enqueue while serial request is active', t => {
+test('event poll uses the low-latency interval', t => {
     const {peripheral} = makePeripheral();
     const originalWindow = global.window;
     global.window = {
-        setTimeout: () => 1,
+        setTimeout: (callback, delay) => {
+            t.equal(delay, 25);
+            return 1;
+        },
         clearTimeout: () => {}
     };
 
     peripheral._isRealtimeConnected = true;
     peripheral.isConnected = () => true;
-    peripheral._activeRequest = {};
-    peripheral._request = () => {
-        t.fail('POLL should not be requested while another request is active');
-    };
 
-    peripheral._pollEvents();
+    peripheral._scheduleNextPoll();
     t.equal(peripheral._eventPollTimeoutID, 1);
     global.window = originalWindow;
     t.end();
 });
 
-test('poll does not enqueue while user request is queued', t => {
+test('event poll is queued before pending sensor refreshes', t => {
     const {peripheral} = makePeripheral();
-    const originalWindow = global.window;
-    global.window = {
-        setTimeout: () => 1,
-        clearTimeout: () => {}
-    };
-
     peripheral._isRealtimeConnected = true;
     peripheral.isConnected = () => true;
+    peripheral._activeRequest = {};
     peripheral._requestQueue.push({
-        command: 'BTN A'
+        command: 'ACC X'
     });
-    peripheral._request = () => {
-        t.fail('POLL should not be requested while another request is queued');
-    };
 
     peripheral._pollEvents();
-    t.equal(peripheral._eventPollTimeoutID, 1);
-    global.window = originalWindow;
+    t.equal(peripheral._requestQueue.length, 2);
+    t.equal(peripheral._requestQueue[0].command, 'POLL');
+    t.equal(peripheral._requestQueue[1].command, 'ACC X');
     t.end();
 });

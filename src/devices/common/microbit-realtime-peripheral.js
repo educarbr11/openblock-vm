@@ -5,7 +5,8 @@ const Serialport = require('../../io/serialport');
 const MICROBIT_REALTIME_TIMEOUT = 2000;
 const MICROBIT_REALTIME_CONNECT_TIMEOUT = 9000;
 const MICROBIT_REALTIME_RETRY_INTERVAL = 300;
-const MICROBIT_REALTIME_POLL_INTERVAL = 200;
+const MICROBIT_REALTIME_POLL_INTERVAL = 25;
+const MICROBIT_REALTIME_INPUT_REFRESH_INTERVAL = 40;
 const MICROBIT_REALTIME_VERSION = 'microbit-realtime-v2';
 
 const ConnectMicrobitTimeout =
@@ -79,6 +80,8 @@ class MicrobitRealtimePeripheral{
         this._connectRetryTimeoutID = null;
         this._eventPollTimeoutID = null;
         this._isRealtimeConnecting = false;
+        this._inputCache = {};
+        this._inputRefreshState = {};
         this._lastEventState = {
             a: false,
             b: false,
@@ -294,10 +297,16 @@ class MicrobitRealtimePeripheral{
     /**
      * Read button state.
      * @param {KEY} key - button A or B.
-     * @return {Promise} - a Promise that resolves to true if pressed.
+     * @return {boolean} - latest cached button state.
      */
     buttonIsPressed (key) {
-        return this._request(`BTN ${String(key).toUpperCase()}`, false, value => Number(value) === 1);
+        const normalizedKey = String(key).toLowerCase() === 'b' ? 'b' : 'a';
+        return this._readCachedInput(
+            `button:${normalizedKey}`,
+            false,
+            `BTN ${normalizedKey.toUpperCase()}`,
+            value => Number(value) === 1
+        );
     }
 
     /**
@@ -312,13 +321,20 @@ class MicrobitRealtimePeripheral{
     /**
      * Read accelerometer axis.
      * @param {AXIS} axis - axis name.
-     * @return {Promise} - a Promise that resolves to acceleration value.
+     * @return {number} - latest cached acceleration value.
      */
     axisAcceleration (axis) {
-        return this._request(`ACC ${String(axis).toUpperCase()}`, '', value => {
-            const number = Number(value);
-            return Number.isNaN(number) ? '' : number;
-        });
+        const normalizedAxis = ['x', 'y', 'z'].indexOf(String(axis).toLowerCase()) === -1 ?
+            'x' : String(axis).toLowerCase();
+        return this._readCachedInput(
+            `acceleration:${normalizedAxis}`,
+            0,
+            `ACC ${normalizedAxis.toUpperCase()}`,
+            value => {
+                const number = Number(value);
+                return Number.isNaN(number) ? 0 : number;
+            }
+        );
     }
 
     /**
@@ -507,6 +523,8 @@ class MicrobitRealtimePeripheral{
             const request = this._requestQueue.shift();
             request.resolve(request.fallback);
         }
+        this._inputCache = {};
+        this._inputRefreshState = {};
     }
 
     /**
@@ -527,25 +545,73 @@ class MicrobitRealtimePeripheral{
      * @param {*} fallback - value returned when unavailable or timed out.
      * @param {Function} parser - parser for OK value.
      * @param {boolean} allowBeforeReady - true to allow handshake commands before ready state.
+     * @param {boolean} prioritize - true to place this request before queued sensor reads.
      * @return {Promise} - a Promise that resolves to parsed response or fallback.
      * @private
      */
-    _request (command, fallback, parser, allowBeforeReady = false) {
+    _request (command, fallback, parser, allowBeforeReady = false, prioritize = false) {
         if (!this._runtime.isRealtimeMode() || !this.isConnected() ||
             (!allowBeforeReady && !this._isRealtimeConnected)) {
             return Promise.resolve(fallback);
         }
 
         return new Promise(resolve => {
-            this._requestQueue.push({
+            const request = {
                 command: command,
                 fallback: fallback,
                 parser: parser,
                 resolve: resolve,
                 timeoutId: null
-            });
+            };
+            if (prioritize) {
+                this._requestQueue.unshift(request);
+            } else {
+                this._requestQueue.push(request);
+            }
             this._drainRequestQueue();
         });
+    }
+
+    /**
+     * Return the latest realtime input immediately and refresh it in the background.
+     * Scratch control loops must not wait for a USB round trip on every frame.
+     * @param {string} cacheKey - stable key for this input.
+     * @param {*} fallback - value used before the first successful read.
+     * @param {string} command - realtime firmware command.
+     * @param {Function} parser - parser for the command response.
+     * @return {*} the latest cached input value.
+     * @private
+     */
+    _readCachedInput (cacheKey, fallback, command, parser) {
+        const hasCachedValue = Object.prototype.hasOwnProperty.call(this._inputCache, cacheKey);
+        const cachedValue = hasCachedValue ? this._inputCache[cacheKey] : fallback;
+
+        if (!this.isReady()) {
+            return cachedValue;
+        }
+
+        const now = Date.now();
+        const refreshState = this._inputRefreshState[cacheKey] || {
+            pending: false,
+            lastRequestedAt: 0
+        };
+        this._inputRefreshState[cacheKey] = refreshState;
+
+        if (!refreshState.pending &&
+            now - refreshState.lastRequestedAt >= MICROBIT_REALTIME_INPUT_REFRESH_INTERVAL) {
+            refreshState.pending = true;
+            refreshState.lastRequestedAt = now;
+            this._request(command, cachedValue, parser).then(value => {
+                if (this.isReady()) {
+                    this._inputCache[cacheKey] = value;
+                }
+                refreshState.pending = false;
+            }, () => {
+                refreshState.pending = false;
+            });
+        }
+
+        return cachedValue;
     }
 
     /**
@@ -604,18 +670,14 @@ class MicrobitRealtimePeripheral{
     }
 
     /**
-     * Poll hardware state only when the serial queue is free.
+     * Poll hardware events with priority over queued sensor refreshes.
      * @private
      */
     _pollEvents () {
         if (!this.isReady()) {
             return;
         }
-        if (this._activeRequest || this._requestQueue.length > 0) {
-            this._scheduleNextPoll();
-            return;
-        }
-        this._request('POLL', '', value => value)
+        this._request('POLL', '', value => value, false, true)
             .then(value => {
                 this._handlePollEvent(value);
                 this._scheduleNextPoll();
@@ -646,6 +708,9 @@ class MicrobitRealtimePeripheral{
             logo: parts[7] === '1',
             soundEvent: String(parts[9] || '').toLowerCase()
         };
+
+        this._inputCache['button:a'] = state.a;
+        this._inputCache['button:b'] = state.b;
 
         this._triggerMicrobitButtonHats('a', state.a);
         this._triggerMicrobitButtonHats('b', state.b);
