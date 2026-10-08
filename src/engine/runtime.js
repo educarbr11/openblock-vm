@@ -2002,6 +2002,7 @@ class Runtime extends EventEmitter {
      */
     attachAudioEngine (audioEngine) {
         this.audioEngine = audioEngine;
+        this.emit('AUDIO_ENGINE_ATTACHED');
     }
 
     /**

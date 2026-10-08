@@ -16,6 +16,34 @@ const util = {
     yield: () => null
 };
 
+test('sound loading waits for the audio engine and only runs once', t => {
+    const listeners = Object.create(null);
+    const runtime = {
+        audioEngine: null,
+        getTargetForStage: () => ({tempo: 60}),
+        on: (event, listener) => {
+            listeners[event] = listener;
+        }
+    };
+    const originalLoadAllSounds = Music.prototype._loadAllSounds;
+    let loadCount = 0;
+    Music.prototype._loadAllSounds = () => {
+        loadCount++;
+        return Promise.resolve();
+    };
+
+    const deferredBlocks = new Music(runtime);
+    t.equal(loadCount, 0, 'does not load before an audio engine exists');
+    runtime.audioEngine = {};
+    listeners.AUDIO_ENGINE_ATTACHED();
+    listeners.AUDIO_ENGINE_ATTACHED();
+    t.equal(loadCount, 1, 'loads only once after the audio engine is attached');
+
+    Music.prototype._loadAllSounds = originalLoadAllSounds;
+    t.ok(deferredBlocks instanceof Music, 'constructs the extension while loading is deferred');
+    t.end();
+});
+
 test('playDrum uses 1-indexing and wrap clamps', t => {
     // Stub playDrumNum
     let playedDrum;

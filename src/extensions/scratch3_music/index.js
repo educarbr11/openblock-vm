@@ -3,6 +3,7 @@ const BlockType = require('../../extension-support/block-type');
 const Clone = require('../../util/clone');
 const Cast = require('../../util/cast');
 const formatMessage = require('format-message');
+const log = require('../../util/log');
 const MathUtil = require('../../util/math-util');
 const Timer = require('../../util/timer');
 
@@ -81,7 +82,10 @@ class Scratch3MusicBlocks {
          */
         this._bufferSources = [];
 
-        this._loadAllSounds();
+        this._soundsLoaded = false;
+        this._loadAllSoundsWhenReady = this._loadAllSoundsWhenReady.bind(this);
+        this.runtime.on('AUDIO_ENGINE_ATTACHED', this._loadAllSoundsWhenReady);
+        this._loadAllSoundsWhenReady();
 
         this._onTargetCreated = this._onTargetCreated.bind(this);
         this.runtime.on('targetWasCreated', this._onTargetCreated);
@@ -92,6 +96,7 @@ class Scratch3MusicBlocks {
 
     /**
      * Decode the full set of drum and instrument sounds, and store the audio buffers in arrays.
+     * @returns {Promise} Resolves after all available samples have been decoded.
      */
     _loadAllSounds () {
         const loadingPromises = [];
@@ -109,8 +114,21 @@ class Scratch3MusicBlocks {
                 loadingPromises.push(promise);
             });
         });
-        Promise.all(loadingPromises).then(() => {
+        return Promise.all(loadingPromises).then(() => {
             // @TODO: Update the extension status indicator.
+        });
+    }
+
+    /**
+     * Load instrument samples once the GUI has attached its audio engine.
+     * @private
+     */
+    _loadAllSoundsWhenReady () {
+        if (this._soundsLoaded || !this.runtime.audioEngine) return;
+        this._soundsLoaded = true;
+        this._loadAllSounds().catch(error => {
+            this._soundsLoaded = false;
+            log.warn('Could not load music extension sounds', error);
         });
     }
 
