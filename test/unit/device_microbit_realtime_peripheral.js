@@ -39,6 +39,28 @@ test('parse realtime response lines', t => {
     t.end();
 });
 
+test('micro:bit scan selects browser serial transport when requested', t => {
+    const {peripheral} = makePeripheral();
+    let socketType = null;
+    peripheral._runtime.getScratchLinkSocket = type => {
+        socketType = type;
+        return {
+            setOnOpen: () => {},
+            setOnClose: () => {},
+            setOnError: () => {},
+            setHandleMessage: () => {},
+            sendMessage: () => {},
+            isOpen: () => false,
+            open: () => {}
+        };
+    };
+
+    peripheral.scan(null, false, 'webSerial');
+
+    t.equal(socketType, 'WEB_SERIAL');
+    t.end();
+});
+
 test('button reporter returns cached state without waiting for USB', t => {
     const {peripheral} = makePeripheral();
     let resolveRequest;

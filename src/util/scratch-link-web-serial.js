@@ -162,7 +162,8 @@ class ScratchLinkWebSerial {
         const allowAnyPort = ['arduinoUno', 'arduinoNano'].includes(params.deviceId);
         return navigator.serial.getPorts()
             .then(ports => {
-                if (ports.length === 0 && navigator.userActivation && navigator.userActivation.isActive) {
+                const matchingPorts = ports.filter(port => allowAnyPort || this._matchesFilters(port, filters));
+                if (matchingPorts.length === 0 && navigator.userActivation && navigator.userActivation.isActive) {
                     return navigator.serial.requestPort(this._makeRequestOptions(filters, allowAnyPort))
                         .then(port => [port])
                         .catch(error => {
@@ -172,12 +173,10 @@ class ScratchLinkWebSerial {
                             throw error;
                         });
                 }
-                return ports;
+                return matchingPorts;
             })
             .then(ports => {
-                ports
-                    .filter(port => allowAnyPort || this._matchesFilters(port, filters))
-                    .forEach(port => this._reportPort(port));
+                ports.forEach(port => this._reportPort(port));
                 return null;
             });
     }

@@ -156,12 +156,14 @@ class MicrobitRealtimePeripheral{
      * Called by the runtime when user wants to scan for a peripheral.
      * @param {Array.<string>} pnpidList - the array of pnp id list
      * @param {bool} listAll - wether list all connectable device
+     * @param {string} connectionType - the transport used for the serial connection
      */
-    scan (pnpidList, listAll) {
+    scan (pnpidList, listAll, connectionType = 'link') {
         if (this._serialport) {
             this._serialport.disconnect();
         }
         this._serialport = new Serialport(this._runtime, this._originalDeviceId, {
+            connectionType: connectionType,
             filters: {
                 pnpid: listAll ? ['*'] : (pnpidList ? pnpidList : this.pnpidList)
             }
