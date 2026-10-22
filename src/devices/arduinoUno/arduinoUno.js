@@ -18,7 +18,16 @@ const PNPID_LIST = [
     'USB\\VID_2A03&PID_0043',
     'USB\\VID_2341&PID_0243',
     // For chinese clones that use CH340
-    'USB\\VID_1A86&PID_7523'
+    'USB\\VID_1A86&PID_7523',
+    // Newer clones use other USB-serial chips (same list as arduinoNano.js):
+    // CH343, CH9102, PL2303, FTDI and CP210x
+    'USB\\VID_1A86&PID_55D3',
+    'USB\\VID_1A86&PID_55D4',
+    'USB\\VID_067B&PID_2303',
+    'USB\\VID_0403&PID_6001',
+    'USB\\VID_0403&PID_6010',
+    'USB\\VID_0403&PID_6015',
+    'USB\\VID_10C4&PID_EA60'
 ];
 
 /**
