@@ -2,6 +2,11 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const defaultsDeep = require('lodash.defaultsdeep');
 const path = require('path');
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+const crypto = require('crypto');
+
+// Match the GUI build: Webpack 4's MD4 hashes are unavailable on current Node/OpenSSL.
+const createHash = crypto.createHash;
+crypto.createHash = (algorithm, options) => createHash(algorithm === 'md4' ? 'sha256' : algorithm, options);
 
 const base = {
     mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',

@@ -64,7 +64,8 @@ const allowedBuiltinExtensionIds = new Set(Object.keys(builtinExtensions));
 const allowedBuiltinDeviceIds = new Set(Object.keys(builtinDevices));
 const allowedDeviceExtensionIds = new Set([
     'displayLcd',
-    'ledMatrix'
+    'ledMatrix',
+    'fingerprint'
 ]);
 
 const getStaticDeviceExtensions = () => {
@@ -109,6 +110,26 @@ const getStaticDeviceExtensions = () => {
             official: true,
             tags: ['display'],
             helpLink: 'https://wiki.openblock.cc'
+        },
+        {
+            name: isPortuguese ? 'Leitor de digitais' : 'Fingerprint',
+            extensionId: 'fingerprint',
+            version: '1.0.0',
+            supportDevice: ['arduinoUno', 'arduinoNano', 'arduinoLeonardo'],
+            author: 'Dogoblock',
+            iconURL: 'fingerprint/assets/fingerprint.svg',
+            description: isPortuguese ?
+                'Cadastre e reconheça digitais com um sensor UART AS608/R307.' :
+                'Enroll and recognize fingerprints with an AS608/R307 UART sensor.',
+            featured: true,
+            blocks: 'fingerprint/blocks.js',
+            generator: 'fingerprint/generator.js',
+            toolbox: 'fingerprint/toolbox.js',
+            translations: 'fingerprint/translations.js',
+            library: 'fingerprint/lib',
+            official: true,
+            tags: ['sensor'],
+            helpLink: 'https://learn.adafruit.com/adafruit-optical-fingerprint-sensor'
         }
     ];
 };
@@ -607,22 +628,44 @@ class ExtensionManager {
             global.registerGenerators = null;
             global.registerBlocksMessages = null;
 
+            let registered = false;
             loadjs(registerUrls, {returnPromise: true})
                 .then(() => {
                     const getToolboxXML = global.registerToolboxs;
-                    this.runtime.addDeviceExtension(deviceExtensionId, getToolboxXML(), deviceExtension.library);
-
                     const deviceExtensionsRegister = {
                         defineBlocks: global.registerBlocks,
                         defineGenerators: global.registerGenerators,
                         defineMessages: global.registerBlocksMessages
                     };
+                    const registrations = [
+                        ['toolbox', getToolboxXML],
+                        ['blocks', deviceExtensionsRegister.defineBlocks],
+                        ['generator', deviceExtensionsRegister.defineGenerators],
+                        ['translations', deviceExtensionsRegister.defineMessages]
+                    ];
+                    registrations.forEach(([script, register]) => {
+                        if (deviceExtension[script] && typeof register !== 'function') {
+                            throw new Error(`Missing ${script} registration for ${deviceExtensionId}`);
+                        }
+                    });
+
+                    this.runtime.addDeviceExtension(deviceExtensionId, getToolboxXML(), deviceExtension.library);
+                    registered = true;
 
                     this.runtime.emit(this.runtime.constructor.DEVICE_EXTENSION_ADDED, deviceExtensionsRegister);
                     return resolve();
                 })
-                .catch(err => reject(`Error while load device extension ` +
-                    `${deviceExtension.extensionId}'s js file: ${err}`));
+                .catch(err => {
+                    if (registered) {
+                        this.runtime.removeDeviceExtension(deviceExtensionId);
+                        try {
+                            this.runtime.emit(this.runtime.constructor.DEVICE_EXTENSION_REMOVED);
+                        } catch (cleanupError) {
+                            log.warn(`Could not refresh toolbox after failed extension load: ${cleanupError}`);
+                        }
+                    }
+                    reject(`Error while load device extension ${deviceExtension.extensionId}'s js file: ${err}`);
+                });
         });
     }
 
