@@ -36,7 +36,8 @@ const builtinExtensions = {
     videoSensing: () => require('../extensions/scratch3_video_sensing'),
     microbitBle: () => require('../extensions/scratch3_microbit_ble'),
     machineLearning: () => require('../extensions/scratch3_machine_learning'),
-    handPoseDetection: () => require('../extensions/scratch3_hand_pose_detection')
+    handPoseDetection: () => require('../extensions/scratch3_hand_pose_detection'),
+    lan: () => require('../extensions/scratch3_lan')
 };
 
 const builtinDevices = {

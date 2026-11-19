@@ -213,6 +213,9 @@ class VirtualMachine extends EventEmitter {
         this.runtime.on('HAND_POSE_DETECTION_OPEN_TRAINER', () => {
             this.emit('HAND_POSE_DETECTION_OPEN_TRAINER');
         });
+        this.runtime.on('LAN_STATUS', state => {
+            this.emit('LAN_STATUS', state);
+        });
 
         this.extensionManager = new ExtensionManager(this.runtime);
 

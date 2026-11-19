@@ -1,3 +1,4 @@
+/* global process */
 /**
  * This class provides a ScratchLinkSocket implementation using WebSockets,
  * attempting to connect with the locally installed Scratch-Link.
@@ -40,6 +41,9 @@ class ScratchLinkWebSocket {
             break;
         case 'SERIALPORT':
             this._ws = new WebSocket(this._getServerUrl('/openblock/serialport'));
+            break;
+        case 'LAN':
+            this._ws = new WebSocket(this._getServerUrl('/openblock/lan'));
             break;
         default:
             throw new Error(`Unknown OpenblockLink socket Type: ${this._type}`);
